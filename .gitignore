@@ -1,0 +1,6 @@
+.DS_Store
+/build
+.obj/
+.ninja_deps
+.ninja_log
+/.cache
