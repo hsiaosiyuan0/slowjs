@@ -1,11 +1,569 @@
 #include "vm.h"
 
+#include "cfunc.h"
 #include "class.h"
 #include "error.h"
 #include "func.h"
+#include "intrins/intrins.h"
 #include "mod.h"
 #include "obj.h"
 #include "parse/parse.h"
+
+/* -- JSContext --------------------------------- */
+
+JSContext *JS_NewContextRaw(JSRuntime *rt) {
+  JSContext *ctx;
+  int i;
+
+  ctx = js_mallocz_rt(rt, sizeof(JSContext));
+  if (!ctx)
+    return NULL;
+  ctx->header.ref_count = 1;
+  add_gc_object(rt, &ctx->header, JS_GC_OBJ_TYPE_JS_CONTEXT);
+
+  ctx->class_proto =
+      js_malloc_rt(rt, sizeof(ctx->class_proto[0]) * rt->class_count);
+  if (!ctx->class_proto) {
+    js_free_rt(rt, ctx);
+    return NULL;
+  }
+  ctx->rt = rt;
+  list_add_tail(&ctx->link, &rt->context_list);
+#ifdef CONFIG_BIGNUM
+  ctx->bf_ctx = &rt->bf_ctx;
+  ctx->fp_env.prec = 113;
+  ctx->fp_env.flags = bf_set_exp_bits(15) | BF_RNDN | BF_FLAG_SUBNORMAL;
+#endif
+  for (i = 0; i < rt->class_count; i++)
+    ctx->class_proto[i] = JS_NULL;
+  ctx->array_ctor = JS_NULL;
+  ctx->regexp_ctor = JS_NULL;
+  ctx->promise_ctor = JS_NULL;
+  init_list_head(&ctx->loaded_modules);
+
+  JS_AddIntrinsicBasicObjects(ctx);
+  return ctx;
+}
+
+JSContext *JS_NewContext(JSRuntime *rt) {
+  JSContext *ctx;
+
+  ctx = JS_NewContextRaw(rt);
+  if (!ctx)
+    return NULL;
+
+  JS_AddIntrinsicBaseObjects(ctx);
+  JS_AddIntrinsicDate(ctx);
+  JS_AddIntrinsicEval(ctx);
+  JS_AddIntrinsicStringNormalize(ctx);
+  JS_AddIntrinsicRegExp(ctx);
+  JS_AddIntrinsicJSON(ctx);
+  JS_AddIntrinsicProxy(ctx);
+  JS_AddIntrinsicMapSet(ctx);
+  JS_AddIntrinsicTypedArrays(ctx);
+  JS_AddIntrinsicPromise(ctx);
+#ifdef CONFIG_BIGNUM
+  JS_AddIntrinsicBigInt(ctx);
+#endif
+  return ctx;
+}
+
+JSContext *JS_DupContext(JSContext *ctx) {
+  ctx->header.ref_count++;
+  return ctx;
+}
+
+/* WARNING: obj is freed */
+JSValue JS_Throw(JSContext *ctx, JSValue obj) {
+  JSRuntime *rt = ctx->rt;
+  JS_FreeValue(ctx, rt->current_exception);
+  rt->current_exception = obj;
+  return JS_EXCEPTION;
+}
+
+/* return the pending exception (cannot be called twice). */
+JSValue JS_GetException(JSContext *ctx) {
+  JSValue val;
+  JSRuntime *rt = ctx->rt;
+  val = rt->current_exception;
+  rt->current_exception = JS_NULL;
+  return val;
+}
+
+void JS_FreeContext(JSContext *ctx) {
+  JSRuntime *rt = ctx->rt;
+  int i;
+
+  if (--ctx->header.ref_count > 0)
+    return;
+  assert(ctx->header.ref_count == 0);
+
+#ifdef DUMP_ATOMS
+  JS_DumpAtoms(ctx->rt);
+#endif
+#ifdef DUMP_SHAPES
+  JS_DumpShapes(ctx->rt);
+#endif
+#ifdef DUMP_OBJECTS
+  {
+    struct list_head *el;
+    JSGCObjectHeader *p;
+    printf("JSObjects: {\n");
+    JS_DumpObjectHeader(ctx->rt);
+    list_for_each(el, &rt->gc_obj_list) {
+      p = list_entry(el, JSGCObjectHeader, link);
+      JS_DumpGCObject(rt, p);
+    }
+    printf("}\n");
+  }
+#endif
+#ifdef DUMP_MEM
+  {
+    JSMemoryUsage stats;
+    JS_ComputeMemoryUsage(rt, &stats);
+    JS_DumpMemoryUsage(stdout, &stats, rt);
+  }
+#endif
+
+  js_free_modules(ctx, JS_FREE_MODULE_ALL);
+
+  JS_FreeValue(ctx, ctx->global_obj);
+  JS_FreeValue(ctx, ctx->global_var_obj);
+
+  JS_FreeValue(ctx, ctx->throw_type_error);
+  JS_FreeValue(ctx, ctx->eval_obj);
+
+  JS_FreeValue(ctx, ctx->array_proto_values);
+  for (i = 0; i < JS_NATIVE_ERROR_COUNT; i++) {
+    JS_FreeValue(ctx, ctx->native_error_proto[i]);
+  }
+  for (i = 0; i < rt->class_count; i++) {
+    JS_FreeValue(ctx, ctx->class_proto[i]);
+  }
+  js_free_rt(rt, ctx->class_proto);
+  JS_FreeValue(ctx, ctx->iterator_proto);
+  JS_FreeValue(ctx, ctx->async_iterator_proto);
+  JS_FreeValue(ctx, ctx->promise_ctor);
+  JS_FreeValue(ctx, ctx->array_ctor);
+  JS_FreeValue(ctx, ctx->regexp_ctor);
+  JS_FreeValue(ctx, ctx->function_ctor);
+  JS_FreeValue(ctx, ctx->function_proto);
+
+  js_free_shape_null(ctx->rt, ctx->array_shape);
+
+  list_del(&ctx->link);
+  remove_gc_object(&ctx->header);
+  js_free_rt(ctx->rt, ctx);
+}
+
+JSRuntime *JS_GetRuntime(JSContext *ctx) { return ctx->rt; }
+
+void JS_SetClassProto(JSContext *ctx, JSClassID class_id, JSValue obj) {
+  JSRuntime *rt = ctx->rt;
+  assert(class_id < rt->class_count);
+  set_value(ctx, &ctx->class_proto[class_id], obj);
+}
+
+JSValue JS_GetClassProto(JSContext *ctx, JSClassID class_id) {
+  JSRuntime *rt = ctx->rt;
+  assert(class_id < rt->class_count);
+  return JS_DupValue(ctx, ctx->class_proto[class_id]);
+}
+
+JSValue JS_GetGlobalObject(JSContext *ctx) {
+  return JS_DupValue(ctx, ctx->global_obj);
+}
+
+/* -- JSRuntime --------------------------------- */
+
+/* default memory allocation functions with memory limitation */
+static inline size_t js_def_malloc_usable_size(void *ptr) {
+#if defined(__APPLE__)
+  return malloc_size(ptr);
+#elif defined(_WIN32)
+  return _msize(ptr);
+#elif defined(EMSCRIPTEN)
+  return 0;
+#elif defined(__linux__)
+  return malloc_usable_size(ptr);
+#else
+  /* change this to `return 0;` if compilation fails */
+  return malloc_usable_size(ptr);
+#endif
+}
+
+static void *js_def_malloc(JSMallocState *s, size_t size) {
+  void *ptr;
+
+  /* Do not allocate zero bytes: behavior is platform dependent */
+  assert(size != 0);
+
+  if (unlikely(s->malloc_size + size > s->malloc_limit))
+    return NULL;
+
+  ptr = malloc(size);
+  if (!ptr)
+    return NULL;
+
+  s->malloc_count++;
+  s->malloc_size += js_def_malloc_usable_size(ptr) + MALLOC_OVERHEAD;
+  return ptr;
+}
+
+static void js_def_free(JSMallocState *s, void *ptr) {
+  if (!ptr)
+    return;
+
+  s->malloc_count--;
+  s->malloc_size -= js_def_malloc_usable_size(ptr) + MALLOC_OVERHEAD;
+  free(ptr);
+}
+
+static void *js_def_realloc(JSMallocState *s, void *ptr, size_t size) {
+  size_t old_size;
+
+  if (!ptr) {
+    if (size == 0)
+      return NULL;
+    return js_def_malloc(s, size);
+  }
+  old_size = js_def_malloc_usable_size(ptr);
+  if (size == 0) {
+    s->malloc_count--;
+    s->malloc_size -= old_size + MALLOC_OVERHEAD;
+    free(ptr);
+    return NULL;
+  }
+  if (s->malloc_size + size - old_size > s->malloc_limit)
+    return NULL;
+
+  ptr = realloc(ptr, size);
+  if (!ptr)
+    return NULL;
+
+  s->malloc_size += js_def_malloc_usable_size(ptr) - old_size;
+  return ptr;
+}
+
+static const JSMallocFunctions def_malloc_funcs = {
+    js_def_malloc,
+    js_def_free,
+    js_def_realloc,
+#if defined(__APPLE__)
+    malloc_size,
+#elif defined(_WIN32)
+    (size_t(*)(const void *))_msize,
+#elif defined(EMSCRIPTEN)
+    NULL,
+#elif defined(__linux__)
+    (size_t(*)(const void *))malloc_usable_size,
+#else
+    /* change this to `NULL,` if compilation fails */
+    malloc_usable_size,
+#endif
+};
+
+JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque) {
+  JSRuntime *rt;
+  JSMallocState ms;
+
+  memset(&ms, 0, sizeof(ms));
+  ms.opaque = opaque;
+  ms.malloc_limit = -1;
+
+  rt = mf->js_malloc(&ms, sizeof(JSRuntime));
+  if (!rt)
+    return NULL;
+  memset(rt, 0, sizeof(*rt));
+  rt->mf = *mf;
+  if (!rt->mf.js_malloc_usable_size) {
+    /* use dummy function if none provided */
+    rt->mf.js_malloc_usable_size = js_malloc_usable_size_unknown;
+  }
+  rt->malloc_state = ms;
+  rt->malloc_gc_threshold = 256 * 1024;
+
+#ifdef CONFIG_BIGNUM
+  bf_context_init(&rt->bf_ctx, js_bf_realloc, rt);
+  set_dummy_numeric_ops(&rt->bigint_ops);
+  set_dummy_numeric_ops(&rt->bigfloat_ops);
+  set_dummy_numeric_ops(&rt->bigdecimal_ops);
+#endif
+
+  init_list_head(&rt->context_list);
+  init_list_head(&rt->gc_obj_list);
+  init_list_head(&rt->gc_zero_ref_count_list);
+  rt->gc_phase = JS_GC_PHASE_NONE;
+
+#ifdef DUMP_LEAKS
+  init_list_head(&rt->string_list);
+#endif
+  init_list_head(&rt->job_list);
+
+  if (JS_InitAtoms(rt))
+    goto fail;
+
+  /* create the object, array and function classes */
+  if (init_class_range(rt, js_std_class_def, JS_CLASS_OBJECT,
+                       countof(js_std_class_def)) < 0)
+    goto fail;
+  rt->class_array[JS_CLASS_ARGUMENTS].exotic = &js_arguments_exotic_methods;
+  rt->class_array[JS_CLASS_STRING].exotic = &js_string_exotic_methods;
+  rt->class_array[JS_CLASS_MODULE_NS].exotic = &js_module_ns_exotic_methods;
+
+  rt->class_array[JS_CLASS_C_FUNCTION].call = js_call_c_function;
+  rt->class_array[JS_CLASS_C_FUNCTION_DATA].call = js_c_function_data_call;
+  rt->class_array[JS_CLASS_BOUND_FUNCTION].call = js_call_bound_function;
+  rt->class_array[JS_CLASS_GENERATOR_FUNCTION].call =
+      js_generator_function_call;
+  if (init_shape_hash(rt))
+    goto fail;
+
+  rt->stack_size = JS_DEFAULT_STACK_SIZE;
+  JS_UpdateStackTop(rt);
+
+  rt->current_exception = JS_NULL;
+
+  return rt;
+fail:
+  JS_FreeRuntime(rt);
+  return NULL;
+}
+
+JSRuntime *JS_NewRuntime(void) {
+  return JS_NewRuntime2(&def_malloc_funcs, NULL);
+}
+
+void JS_SetRuntimeInfo(JSRuntime *rt, const char *s) {
+  if (rt)
+    rt->rt_info = s;
+}
+
+void JS_FreeRuntime(JSRuntime *rt) {
+  struct list_head *el, *el1;
+  int i;
+
+  JS_FreeValueRT(rt, rt->current_exception);
+
+  list_for_each_safe(el, el1, &rt->job_list) {
+    JSJobEntry *e = list_entry(el, JSJobEntry, link);
+    for (i = 0; i < e->argc; i++)
+      JS_FreeValueRT(rt, e->argv[i]);
+    js_free_rt(rt, e);
+  }
+  init_list_head(&rt->job_list);
+
+  JS_RunGC(rt);
+
+#ifdef DUMP_LEAKS
+  /* leaking objects */
+  {
+    BOOL header_done;
+    JSGCObjectHeader *p;
+    int count;
+
+    /* remove the internal refcounts to display only the object
+       referenced externally */
+    list_for_each(el, &rt->gc_obj_list) {
+      p = list_entry(el, JSGCObjectHeader, link);
+      p->mark = 0;
+    }
+    gc_decref(rt);
+
+    header_done = FALSE;
+    list_for_each(el, &rt->gc_obj_list) {
+      p = list_entry(el, JSGCObjectHeader, link);
+      if (p->ref_count != 0) {
+        if (!header_done) {
+          printf("Object leaks:\n");
+          JS_DumpObjectHeader(rt);
+          header_done = TRUE;
+        }
+        JS_DumpGCObject(rt, p);
+      }
+    }
+
+    count = 0;
+    list_for_each(el, &rt->gc_obj_list) {
+      p = list_entry(el, JSGCObjectHeader, link);
+      if (p->ref_count == 0) {
+        count++;
+      }
+    }
+    if (count != 0)
+      printf("Secondary object leaks: %d\n", count);
+  }
+#endif
+  assert(list_empty(&rt->gc_obj_list));
+
+  /* free the classes */
+  for (i = 0; i < rt->class_count; i++) {
+    JSClass *cl = &rt->class_array[i];
+    if (cl->class_id != 0) {
+      JS_FreeAtomRT(rt, cl->class_name);
+    }
+  }
+  js_free_rt(rt, rt->class_array);
+
+#ifdef CONFIG_BIGNUM
+  bf_context_end(&rt->bf_ctx);
+#endif
+
+#ifdef DUMP_LEAKS
+  /* only the atoms defined in JS_InitAtoms() should be left */
+  {
+    BOOL header_done = FALSE;
+
+    for (i = 0; i < rt->atom_size; i++) {
+      JSAtomStruct *p = rt->atom_array[i];
+      if (!atom_is_free(p) /* && p->str*/) {
+        if (i >= JS_ATOM_END || p->header.ref_count != 1) {
+          if (!header_done) {
+            header_done = TRUE;
+            if (rt->rt_info) {
+              printf("%s:1: atom leakage:", rt->rt_info);
+            } else {
+              printf("Atom leaks:\n"
+                     "    %6s %6s %s\n",
+                     "ID", "REFCNT", "NAME");
+            }
+          }
+          if (rt->rt_info) {
+            printf(" ");
+          } else {
+            printf("    %6u %6u ", i, p->header.ref_count);
+          }
+          switch (p->atom_type) {
+          case JS_ATOM_TYPE_STRING:
+            JS_DumpString(rt, p);
+            break;
+          case JS_ATOM_TYPE_GLOBAL_SYMBOL:
+            printf("Symbol.for(");
+            JS_DumpString(rt, p);
+            printf(")");
+            break;
+          case JS_ATOM_TYPE_SYMBOL:
+            if (p->hash == JS_ATOM_HASH_SYMBOL) {
+              printf("Symbol(");
+              JS_DumpString(rt, p);
+              printf(")");
+            } else {
+              printf("Private(");
+              JS_DumpString(rt, p);
+              printf(")");
+            }
+            break;
+          }
+          if (rt->rt_info) {
+            printf(":%u", p->header.ref_count);
+          } else {
+            printf("\n");
+          }
+        }
+      }
+    }
+    if (rt->rt_info && header_done)
+      printf("\n");
+  }
+#endif
+
+  /* free the atoms */
+  for (i = 0; i < rt->atom_size; i++) {
+    JSAtomStruct *p = rt->atom_array[i];
+    if (!atom_is_free(p)) {
+#ifdef DUMP_LEAKS
+      list_del(&p->link);
+#endif
+      js_free_rt(rt, p);
+    }
+  }
+  js_free_rt(rt, rt->atom_array);
+  js_free_rt(rt, rt->atom_hash);
+  js_free_rt(rt, rt->shape_hash);
+#ifdef DUMP_LEAKS
+  if (!list_empty(&rt->string_list)) {
+    if (rt->rt_info) {
+      printf("%s:1: string leakage:", rt->rt_info);
+    } else {
+      printf("String leaks:\n"
+             "    %6s %s\n",
+             "REFCNT", "VALUE");
+    }
+    list_for_each_safe(el, el1, &rt->string_list) {
+      JSString *str = list_entry(el, JSString, link);
+      if (rt->rt_info) {
+        printf(" ");
+      } else {
+        printf("    %6u ", str->header.ref_count);
+      }
+      JS_DumpString(rt, str);
+      if (rt->rt_info) {
+        printf(":%u", str->header.ref_count);
+      } else {
+        printf("\n");
+      }
+      list_del(&str->link);
+      js_free_rt(rt, str);
+    }
+    if (rt->rt_info)
+      printf("\n");
+  }
+  {
+    JSMallocState *s = &rt->malloc_state;
+    if (s->malloc_count > 1) {
+      if (rt->rt_info)
+        printf("%s:1: ", rt->rt_info);
+      printf("Memory leak: %" PRIu64 " bytes lost in %" PRIu64 " block%s\n",
+             (uint64_t)(s->malloc_size - sizeof(JSRuntime)),
+             (uint64_t)(s->malloc_count - 1), &"s"[s->malloc_count == 2]);
+    }
+  }
+#endif
+
+  {
+    JSMallocState ms = rt->malloc_state;
+    rt->mf.js_free(&ms, rt);
+  }
+}
+
+void *JS_GetRuntimeOpaque(JSRuntime *rt) { return rt->user_opaque; }
+
+void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque) {
+  rt->user_opaque = opaque;
+}
+
+static void update_stack_limit(JSRuntime *rt) {
+  if (rt->stack_size == 0) {
+    rt->stack_limit = 0; /* no limit */
+  } else {
+    rt->stack_limit = rt->stack_top - rt->stack_size;
+  }
+}
+
+void JS_SetMaxStackSize(JSRuntime *rt, size_t stack_size) {
+  rt->stack_size = stack_size;
+  update_stack_limit(rt);
+}
+
+void JS_UpdateStackTop(JSRuntime *rt) {
+  rt->stack_top = js_get_stack_pointer();
+  update_stack_limit(rt);
+}
+
+void JS_SetInterruptHandler(JSRuntime *rt, JSInterruptHandler *cb,
+                            void *opaque) {
+  rt->interrupt_handler = cb;
+  rt->interrupt_opaque = opaque;
+}
+
+void JS_SetCanBlock(JSRuntime *rt, BOOL can_block) {
+  rt->can_block = can_block;
+}
+
+void JS_SetSharedArrayBufferFunctions(JSRuntime *rt,
+                                      const JSSharedArrayBufferFunctions *sf) {
+  rt->sab_funcs = *sf;
+}
 
 /* -- Global variable ----------------------------------- */
 
@@ -423,61 +981,6 @@ JSValue JS_Eval(JSContext *ctx, const char *input, size_t input_len,
                 const char *filename, int eval_flags) {
   return JS_EvalThis(ctx, ctx->global_obj, input, input_len, filename,
                      eval_flags);
-}
-
-/* Run the <eval> function of the module and of all its requested
-   modules. */
-JSValue js_evaluate_module(JSContext *ctx, JSModuleDef *m) {
-  JSModuleDef *m1;
-  int i;
-  JSValue ret_val;
-
-  if (m->eval_mark)
-    return JS_UNDEFINED; /* avoid cycles */
-
-  if (m->evaluated) {
-    /* if the module was already evaluated, rethrow the exception
-       it raised */
-    if (m->eval_has_exception) {
-      return JS_Throw(ctx, JS_DupValue(ctx, m->eval_exception));
-    } else {
-      return JS_UNDEFINED;
-    }
-  }
-
-  m->eval_mark = TRUE;
-
-  for (i = 0; i < m->req_module_entries_count; i++) {
-    JSReqModuleEntry *rme = &m->req_module_entries[i];
-    m1 = rme->module;
-    if (!m1->eval_mark) {
-      ret_val = js_evaluate_module(ctx, m1);
-      if (JS_IsException(ret_val)) {
-        m->eval_mark = FALSE;
-        return ret_val;
-      }
-      JS_FreeValue(ctx, ret_val);
-    }
-  }
-
-  if (m->init_func) {
-    /* C module init */
-    if (m->init_func(ctx, m) < 0)
-      ret_val = JS_EXCEPTION;
-    else
-      ret_val = JS_UNDEFINED;
-  } else {
-    ret_val = JS_CallFree(ctx, m->func_obj, JS_UNDEFINED, 0, NULL);
-    m->func_obj = JS_UNDEFINED;
-  }
-  if (JS_IsException(ret_val)) {
-    /* save the thrown exception value */
-    m->eval_has_exception = TRUE;
-    m->eval_exception = JS_DupValue(ctx, ctx->rt->current_exception);
-  }
-  m->eval_mark = FALSE;
-  m->evaluated = TRUE;
-  return ret_val;
 }
 
 /* -- Pending job ----------------------------------- */

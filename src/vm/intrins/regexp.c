@@ -84,8 +84,8 @@ static JSValue js_compile_regexp(JSContext *ctx, JSValueConst pattern,
 
 /* create a RegExp object from a string containing the RegExp bytecode
    and the source pattern */
-static JSValue js_regexp_constructor_internal(JSContext *ctx, JSValueConst ctor,
-                                              JSValue pattern, JSValue bc) {
+JSValue js_regexp_constructor_internal(JSContext *ctx, JSValueConst ctor,
+                                       JSValue pattern, JSValue bc) {
   JSValue obj;
   JSObject *p;
   JSRegExp *re;

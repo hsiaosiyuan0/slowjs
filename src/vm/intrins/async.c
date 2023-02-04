@@ -439,8 +439,7 @@ static void js_async_from_sync_iterator_mark(JSRuntime *rt, JSValueConst val,
   }
 }
 
-static JSValue JS_CreateAsyncFromSyncIterator(JSContext *ctx,
-                                              JSValueConst sync_iter) {
+JSValue JS_CreateAsyncFromSyncIterator(JSContext *ctx, JSValueConst sync_iter) {
   JSValue async_iter, next_method;
   JSAsyncFromSyncIteratorData *s;
 

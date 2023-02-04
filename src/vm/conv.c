@@ -1363,6 +1363,22 @@ JSValue js_dtoa(JSContext *ctx, double d, int radix, int n_digits, int flags) {
   return JS_NewString(ctx, buf);
 }
 
+#ifdef CONFIG_BIGNUM
+
+int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val) {
+  return JS_ToBigInt64Free(ctx, pres, JS_DupValue(ctx, val));
+}
+
+#else
+
+int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val) {
+  JS_ThrowUnsupportedBigint(ctx);
+  *pres = 0;
+  return -1;
+}
+
+#endif /* !CONFIG_BIGNUM */
+
 /* -- ToString ----------------------------------- */
 
 JSValue JS_ToStringInternal(JSContext *ctx, JSValueConst val,
@@ -1445,6 +1461,10 @@ JSValue JS_ToLocaleStringFree(JSContext *ctx, JSValue val) {
   if (JS_IsUndefined(val) || JS_IsNull(val))
     return JS_ToStringFree(ctx, val);
   return JS_InvokeFree(ctx, val, JS_ATOM_toLocaleString, 0, NULL);
+}
+
+JSValue JS_ToPropertyKey(JSContext *ctx, JSValueConst val) {
+  return JS_ToStringInternal(ctx, val, TRUE);
 }
 
 JSValue JS_ToQuotedString(JSContext *ctx, JSValueConst val1) {

@@ -217,6 +217,8 @@ extern const JSCFunctionListEntry js_boolean_proto_funcs[2];
 
 /* -- String ----------------------------------- */
 
+const JSClassExoticMethods js_string_exotic_methods;
+
 JSValue js_string_constructor(JSContext *ctx, JSValueConst new_target, int argc,
                               JSValueConst *argv);
 int64_t string_advance_index(JSString *p, int64_t index, BOOL unicode);
@@ -240,6 +242,11 @@ void js_random_init(JSContext *ctx);
 extern const JSCFunctionListEntry js_math_obj[1];
 
 /* -- RegExp ----------------------------------- */
+
+/* create a RegExp object from a string containing the RegExp bytecode
+   and the source pattern */
+JSValue js_regexp_constructor_internal(JSContext *ctx, JSValueConst ctor,
+                                       JSValue pattern, JSValue bc);
 
 /* return < 0 if exception or TRUE/FALSE */
 int js_is_regexp(JSContext *ctx, JSValueConst obj);
@@ -265,6 +272,7 @@ typedef struct JSProxyData {
 
 JSValue JS_ThrowTypeErrorRevokedProxy(JSContext *ctx);
 
+int js_proxy_isArray(JSContext *ctx, JSValueConst obj);
 JSValue js_proxy_getPrototypeOf(JSContext *ctx, JSValueConst obj);
 int js_proxy_setPrototypeOf(JSContext *ctx, JSValueConst obj,
                             JSValueConst proto_val, BOOL throw_flag);
@@ -346,6 +354,9 @@ extern const JSCFunctionListEntry js_generator_proto_funcs[4];
 #define GEN_MAGIC_RETURN 1
 #define GEN_MAGIC_THROW 2
 
+JSValue js_generator_function_call(JSContext *ctx, JSValueConst func_obj,
+                                   JSValueConst this_obj, int argc,
+                                   JSValueConst *argv, int flags);
 void js_generator_finalizer(JSRuntime *rt, JSValue obj);
 void js_generator_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
 
@@ -429,6 +440,7 @@ extern const JSCFunctionListEntry js_async_iterator_proto_funcs[1];
 
 /* -- AsyncFromSyncIteratorPrototype ----------------------------------- */
 
+JSValue JS_CreateAsyncFromSyncIterator(JSContext *ctx, JSValueConst sync_iter);
 extern const JSCFunctionListEntry js_async_from_sync_iterator_proto_funcs[3];
 
 /* -- AsyncGeneratorFunction ----------------------------------- */

@@ -1,5 +1,62 @@
 #include "num.h"
 
+#ifdef CONFIG_BIGNUM
+
+JSValue JS_NewBigInt64_1(JSContext *ctx, int64_t v) {
+  JSValue val;
+  bf_t *a;
+  val = JS_NewBigInt(ctx);
+  if (JS_IsException(val))
+    return val;
+  a = JS_GetBigInt(val);
+  if (bf_set_si(a, v)) {
+    JS_FreeValue(ctx, val);
+    return JS_ThrowOutOfMemory(ctx);
+  }
+  return val;
+}
+
+JSValue JS_NewBigInt64(JSContext *ctx, int64_t v) {
+  if (is_math_mode(ctx) && v >= -MAX_SAFE_INTEGER && v <= MAX_SAFE_INTEGER) {
+    return JS_NewInt64(ctx, v);
+  } else {
+    return JS_NewBigInt64_1(ctx, v);
+  }
+}
+
+JSValue JS_NewBigUint64(JSContext *ctx, uint64_t v) {
+  JSValue val;
+  if (is_math_mode(ctx) && v <= MAX_SAFE_INTEGER) {
+    val = JS_NewInt64(ctx, v);
+  } else {
+    bf_t *a;
+    val = JS_NewBigInt(ctx);
+    if (JS_IsException(val))
+      return val;
+    a = JS_GetBigInt(val);
+    if (bf_set_ui(a, v)) {
+      JS_FreeValue(ctx, val);
+      return JS_ThrowOutOfMemory(ctx);
+    }
+  }
+  return val;
+}
+#else
+
+JSValue JS_ThrowUnsupportedBigint(JSContext *ctx) {
+  return JS_ThrowTypeError(ctx, "bigint is not supported");
+}
+
+JSValue JS_NewBigInt64(JSContext *ctx, int64_t v) {
+  return JS_ThrowUnsupportedBigint(ctx);
+}
+
+JSValue JS_NewBigUint64(JSContext *ctx, uint64_t v) {
+  return JS_ThrowUnsupportedBigint(ctx);
+}
+
+#endif /* !CONFIG_BIGNUM */
+
 double js_pow(double a, double b) {
   if (unlikely(!isfinite(b)) && fabs(a) == 1) {
     /* not compatible with IEEE 754 */

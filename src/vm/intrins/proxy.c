@@ -824,7 +824,7 @@ fail:
   return ret;
 }
 
-static int js_proxy_isArray(JSContext *ctx, JSValueConst obj) {
+int js_proxy_isArray(JSContext *ctx, JSValueConst obj) {
   JSProxyData *s = JS_GetOpaque(obj, JS_CLASS_PROXY);
   if (!s)
     return FALSE;

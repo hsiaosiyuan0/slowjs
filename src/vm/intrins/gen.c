@@ -127,6 +127,38 @@ static JSValue js_generator_next(JSContext *ctx, JSValueConst this_val,
   return ret;
 }
 
+JSValue js_generator_function_call(JSContext *ctx, JSValueConst func_obj,
+                                   JSValueConst this_obj, int argc,
+                                   JSValueConst *argv, int flags) {
+  JSValue obj, func_ret;
+  JSGeneratorData *s;
+
+  s = js_mallocz(ctx, sizeof(*s));
+  if (!s)
+    return JS_EXCEPTION;
+  s->state = JS_GENERATOR_STATE_SUSPENDED_START;
+  if (async_func_init(ctx, &s->func_state, func_obj, this_obj, argc, argv)) {
+    s->state = JS_GENERATOR_STATE_COMPLETED;
+    goto fail;
+  }
+
+  /* execute the function up to 'OP_initial_yield' */
+  func_ret = async_func_resume(ctx, &s->func_state);
+  if (JS_IsException(func_ret))
+    goto fail;
+  JS_FreeValue(ctx, func_ret);
+
+  obj = js_create_from_ctor(ctx, func_obj, JS_CLASS_GENERATOR);
+  if (JS_IsException(obj))
+    goto fail;
+  JS_SetOpaque(obj, s);
+  return obj;
+fail:
+  free_generator_stack_rt(ctx->rt, s);
+  js_free(ctx, s);
+  return JS_EXCEPTION;
+}
+
 const JSCFunctionListEntry js_generator_function_proto_funcs[] = {
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "GeneratorFunction",
                        JS_PROP_CONFIGURABLE),

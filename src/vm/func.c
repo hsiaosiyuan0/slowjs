@@ -12,6 +12,10 @@
 
 /* -- Arguments ----------------------------------- */
 
+const JSClassExoticMethods js_arguments_exotic_methods = {
+    .define_own_property = js_arguments_define_own_property,
+};
+
 int js_arguments_define_own_property(JSContext *ctx, JSValueConst this_obj,
                                      JSAtom prop, JSValueConst val,
                                      JSValueConst getter, JSValueConst setter,
@@ -29,10 +33,6 @@ int js_arguments_define_own_property(JSContext *ctx, JSValueConst this_obj,
   return JS_DefineProperty(ctx, this_obj, prop, val, getter, setter,
                            flags | JS_PROP_NO_EXOTIC);
 }
-
-static const JSClassExoticMethods js_arguments_exotic_methods = {
-    .define_own_property = js_arguments_define_own_property,
-};
 
 JSValue js_build_arguments(JSContext *ctx, int argc, JSValueConst *argv) {
   JSValue val, *tab;
@@ -354,13 +354,6 @@ JSValue JS_InvokeFree(JSContext *ctx, JSValue this_val, JSAtom atom, int argc,
   JSValue res = JS_Invoke(ctx, this_val, atom, argc, argv);
   JS_FreeValue(ctx, this_val);
   return res;
-}
-
-int check_function(JSContext *ctx, JSValueConst obj) {
-  if (likely(JS_IsFunction(ctx, obj)))
-    return 0;
-  JS_ThrowTypeError(ctx, "not a function");
-  return -1;
 }
 
 /* magic value: 0 = normal apply, 1 = apply for constructor, 2 =

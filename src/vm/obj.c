@@ -249,6 +249,27 @@ int JS_IsInstanceOf(JSContext *ctx, JSValueConst val, JSValueConst obj) {
   return JS_OrdinaryIsInstanceOf(ctx, val, obj);
 }
 
+JSValue js_instantiate_prototype(JSContext *ctx, JSObject *p, JSAtom atom,
+                                 void *opaque) {
+  JSValue obj, this_val;
+  int ret;
+
+  this_val = JS_MKPTR(JS_TAG_OBJECT, p);
+  obj = JS_NewObject(ctx);
+  if (JS_IsException(obj))
+    return JS_EXCEPTION;
+  set_cycle_flag(ctx, obj);
+  set_cycle_flag(ctx, this_val);
+  ret = JS_DefinePropertyValue(ctx, obj, JS_ATOM_constructor,
+                               JS_DupValue(ctx, this_val),
+                               JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+  if (ret < 0) {
+    JS_FreeValue(ctx, obj);
+    return JS_EXCEPTION;
+  }
+  return obj;
+}
+
 /* -- Property ----------------------------------- */
 
 JSContext *js_autoinit_get_realm(JSProperty *pr) {
@@ -311,6 +332,20 @@ int JS_AutoInitProperty(JSContext *ctx, JSObject *p, JSAtom prop,
     return -1;
   pr->u.value = val;
   return 0;
+}
+
+/* return -1 if exception (proxy case) or TRUE/FALSE */
+int JS_IsArray(JSContext *ctx, JSValueConst val) {
+  JSObject *p;
+  if (JS_VALUE_GET_TAG(val) == JS_TAG_OBJECT) {
+    p = JS_VALUE_GET_OBJ(val);
+    if (unlikely(p->class_id == JS_CLASS_PROXY))
+      return js_proxy_isArray(ctx, val);
+    else
+      return p->class_id == JS_CLASS_ARRAY;
+  } else {
+    return FALSE;
+  }
 }
 
 JSValue JS_GetPropertyInternal(JSContext *ctx, JSValueConst obj, JSAtom prop,

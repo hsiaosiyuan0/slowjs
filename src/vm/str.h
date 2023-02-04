@@ -188,6 +188,7 @@ static const char js_atom_init[] =
 /* return the max count from the hash size */
 #define JS_ATOM_COUNT_RESIZE(n) ((n)*2)
 
+int JS_InitAtoms(JSRuntime *rt);
 JSAtom __JS_NewAtom(JSRuntime *rt, JSString *str, int atom_type);
 JSAtom JS_NewAtomStr(JSContext *ctx, JSString *p);
 const char *JS_AtomGetStr(JSContext *ctx, char *buf, int buf_size, JSAtom atom);

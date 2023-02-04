@@ -3,6 +3,31 @@
 
 #include "def.h"
 
+/* -- JSContext --------------------------------- */
+
+JSContext *JS_NewContextRaw(JSRuntime *rt);
+JSContext *JS_NewContext(JSRuntime *rt);
+JSContext *JS_DupContext(JSContext *ctx);
+void JS_FreeContext(JSContext *ctx);
+
+JSRuntime *JS_GetRuntime(JSContext *ctx);
+
+void JS_SetClassProto(JSContext *ctx, JSClassID class_id, JSValue obj);
+JSValue JS_GetClassProto(JSContext *ctx, JSClassID class_id);
+
+/* WARNING: obj is freed */
+JSValue JS_Throw(JSContext *ctx, JSValue obj);
+/* return the pending exception (cannot be called twice). */
+JSValue JS_GetException(JSContext *ctx);
+
+/* -- JSRuntime --------------------------------- */
+
+void JS_SetRuntimeInfo(JSRuntime *rt, const char *s);
+void JS_FreeRuntime(JSRuntime *rt);
+
+void *JS_GetRuntimeOpaque(JSRuntime *rt);
+void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
+
 /* -- Global ----------------------------------- */
 
 #define DEFINE_GLOBAL_LEX_VAR (1 << 7)

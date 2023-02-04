@@ -47,6 +47,20 @@ typedef struct JSBigDecimal {
 } JSBigDecimal;
 #endif
 
+#ifdef CONFIG_BIGNUM
+
+JSValue JS_NewBigInt64_1(JSContext *ctx, int64_t v);
+JSValue JS_NewBigInt64(JSContext *ctx, int64_t v);
+JSValue JS_NewBigUint64(JSContext *ctx, uint64_t v);
+
+#else
+
+JSValue JS_ThrowUnsupportedBigint(JSContext *ctx);
+JSValue JS_NewBigInt64(JSContext *ctx, int64_t v);
+JSValue JS_NewBigUint64(JSContext *ctx, uint64_t v);
+
+#endif /* !CONFIG_BIGNUM */
+
 double js_pow(double a, double b);
 
 /* Note: can return an exception */

@@ -249,10 +249,6 @@ static JSValue js_array_isArray(JSContext *ctx, JSValueConst this_val, int argc,
     return JS_NewBool(ctx, ret);
 }
 
-JSValue js_get_this(JSContext *ctx, JSValueConst this_val) {
-  return JS_DupValue(ctx, this_val);
-}
-
 static JSValue JS_ArraySpeciesCreate(JSContext *ctx, JSValueConst obj,
                                      JSValueConst len_val) {
   JSValue ctor, ret, species;
@@ -1505,23 +1501,6 @@ void js_array_iterator_mark(JSRuntime *rt, JSValueConst val,
   if (it) {
     JS_MarkValue(rt, it->obj, mark_func);
   }
-}
-
-JSValue js_create_array(JSContext *ctx, int len, JSValueConst *tab) {
-  JSValue obj;
-  int i;
-
-  obj = JS_NewArray(ctx);
-  if (JS_IsException(obj))
-    return JS_EXCEPTION;
-  for (i = 0; i < len; i++) {
-    if (JS_CreateDataPropertyUint32(ctx, obj, i, JS_DupValue(ctx, tab[i]), 0) <
-        0) {
-      JS_FreeValue(ctx, obj);
-      return JS_EXCEPTION;
-    }
-  }
-  return obj;
 }
 
 JSValue js_create_array_iterator(JSContext *ctx, JSValueConst this_val,

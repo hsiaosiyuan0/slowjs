@@ -12,7 +12,7 @@
 
 /* -- Malloc ----------------------------------- */
 
-static size_t js_malloc_usable_size_unknown(const void *ptr) { return 0; }
+size_t js_malloc_usable_size_unknown(const void *ptr) { return 0; }
 
 void *js_malloc_rt(JSRuntime *rt, size_t size) {
   return rt->mf.js_malloc(&rt->malloc_state, size);

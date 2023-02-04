@@ -19,6 +19,9 @@ JSValue JS_ToStringFree(JSContext *ctx, JSValue val);
 JSValue JS_ToLocaleStringFree(JSContext *ctx, JSValue val);
 JSValue JS_ToStringCheckObject(JSContext *ctx, JSValueConst val);
 JSValue JS_ToQuotedString(JSContext *ctx, JSValueConst val1);
+
+JSValue JS_ToPropertyKey(JSContext *ctx, JSValueConst val);
+
 /* return (NULL, 0) if exception. */
 /* return pointer into a JSString with a live ref_count */
 /* cesu8 determines if non-BMP1 codepoints are encoded as 1 or 2 utf-8 sequences
@@ -96,6 +99,10 @@ int JS_ToIndex(JSContext *ctx, uint64_t *plen, JSValueConst val);
 __exception int JS_ToLengthFree(JSContext *ctx, int64_t *plen, JSValue val);
 __exception int JS_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
                                      JSValue val, BOOL is_array_ctor);
+
+/* Big number */
+
+int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val);
 
 /* Number to string */
 

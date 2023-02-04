@@ -8,4 +8,5 @@ include_directories("${PROJECT_SOURCE_DIR}")
 
 add_subdirectory(src)
 add_subdirectory(libs)
-add_subdirectory(qjs)
+add_subdirectory(qjsc)
+# add_subdirectory(qjs)

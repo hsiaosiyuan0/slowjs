@@ -90,7 +90,7 @@ static int js_string_delete_property(JSContext *ctx, JSValueConst obj,
   return TRUE;
 }
 
-static const JSClassExoticMethods js_string_exotic_methods = {
+const JSClassExoticMethods js_string_exotic_methods = {
     .get_own_property = js_string_get_own_property,
     .define_own_property = js_string_define_own_property,
     .delete_property = js_string_delete_property,
