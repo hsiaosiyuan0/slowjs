@@ -4,3 +4,4 @@
 .ninja_deps
 .ninja_log
 /.cache
+/qjs/repl.c
