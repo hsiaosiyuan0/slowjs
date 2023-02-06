@@ -276,7 +276,7 @@ JSContext *js_autoinit_get_realm(JSProperty *pr) {
   return (JSContext *)(pr->u.init.realm_and_id & ~3);
 }
 
-static JSAutoInitIDEnum js_autoinit_get_id(JSProperty *pr) {
+JSAutoInitIDEnum js_autoinit_get_id(JSProperty *pr) {
   return pr->u.init.realm_and_id & 3;
 }
 

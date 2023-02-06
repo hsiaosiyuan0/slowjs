@@ -9,12 +9,13 @@
 #include "num.h"
 #include "obj.h"
 #include "str.h"
+#include "vm/vm.h"
 
 #ifdef CONFIG_BIGNUM
 
 /* must be kept in sync with JSOverloadableOperatorEnum */
 /* XXX: use atoms ? */
-static const char js_overloadable_operator_names[JS_OVOP_COUNT][4] = {
+const char js_overloadable_operator_names[JS_OVOP_COUNT][4] = {
     "+",  "-",   "*",  "/", "%",   "**",  "|",  "&",  "^", "<<",
     ">>", ">>>", "==", "<", "pos", "neg", "++", "--", "~",
 };
@@ -68,9 +69,8 @@ static int get_ovop_from_opcode(OPCodeEnum op) {
 }
 
 /* return NULL if not present */
-static JSObject *find_binary_op(JSBinaryOperatorDef *def,
-                                uint32_t operator_index,
-                                JSOverloadableOperatorEnum op) {
+JSObject *find_binary_op(JSBinaryOperatorDef *def, uint32_t operator_index,
+                         JSOverloadableOperatorEnum op) {
   JSBinaryOperatorDefEntry *ent;
   int i;
   for (i = 0; i < def->count; i++) {
@@ -83,11 +83,10 @@ static JSObject *find_binary_op(JSBinaryOperatorDef *def,
 
 /* return -1 if exception, 0 if no operator overloading, 1 if
    overloaded operator called */
-static __exception int js_call_binary_op_fallback(JSContext *ctx, JSValue *pret,
-                                                  JSValueConst op1,
-                                                  JSValueConst op2,
-                                                  OPCodeEnum op,
-                                                  BOOL is_numeric, int hint) {
+__exception int js_call_binary_op_fallback(JSContext *ctx, JSValue *pret,
+                                           JSValueConst op1, JSValueConst op2,
+                                           OPCodeEnum op, BOOL is_numeric,
+                                           int hint) {
   JSValue opset1_obj, opset2_obj, method, ret, new_op1, new_op2;
   JSOperatorSetData *opset1, *opset2;
   JSOverloadableOperatorEnum ovop;
@@ -209,9 +208,9 @@ exception:
 
 /* try to call the operation on the operatorSet field of 'obj'. Only
    used for "/" and "**" on the BigInt prototype in math mode */
-static __exception int
-js_call_binary_op_simple(JSContext *ctx, JSValue *pret, JSValueConst obj,
-                         JSValueConst op1, JSValueConst op2, OPCodeEnum op) {
+__exception int js_call_binary_op_simple(JSContext *ctx, JSValue *pret,
+                                         JSValueConst obj, JSValueConst op1,
+                                         JSValueConst op2, OPCodeEnum op) {
   JSValue opset1_obj, method, ret, new_op1, new_op2;
   JSOperatorSetData *opset1;
   JSOverloadableOperatorEnum ovop;
@@ -262,9 +261,8 @@ exception:
 
 /* return -1 if exception, 0 if no operator overloading, 1 if
    overloaded operator called */
-static __exception int js_call_unary_op_fallback(JSContext *ctx, JSValue *pret,
-                                                 JSValueConst op1,
-                                                 OPCodeEnum op) {
+__exception int js_call_unary_op_fallback(JSContext *ctx, JSValue *pret,
+                                          JSValueConst op1, OPCodeEnum op) {
   JSValue opset1_obj, method, ret;
   JSOperatorSetData *opset1;
   JSOverloadableOperatorEnum ovop;
@@ -307,7 +305,7 @@ exception:
   return -1;
 }
 
-static JSValue throw_bf_exception(JSContext *ctx, int status) {
+JSValue throw_bf_exception(JSContext *ctx, int status) {
   const char *str;
   if (status & BF_ST_MEM_ERROR)
     return JS_ThrowOutOfMemory(ctx);
@@ -321,8 +319,8 @@ static JSValue throw_bf_exception(JSContext *ctx, int status) {
   return JS_ThrowRangeError(ctx, "%s", str);
 }
 
-static int js_unary_arith_bigint(JSContext *ctx, JSValue *pres, OPCodeEnum op,
-                                 JSValue op1) {
+int js_unary_arith_bigint(JSContext *ctx, JSValue *pres, OPCodeEnum op,
+                          JSValue op1) {
   bf_t a_s, *r, *a;
   int ret, v;
   JSValue res;
@@ -372,8 +370,8 @@ static int js_unary_arith_bigint(JSContext *ctx, JSValue *pres, OPCodeEnum op,
   return 0;
 }
 
-static int js_unary_arith_bigfloat(JSContext *ctx, JSValue *pres, OPCodeEnum op,
-                                   JSValue op1) {
+int js_unary_arith_bigfloat(JSContext *ctx, JSValue *pres, OPCodeEnum op,
+                            JSValue op1) {
   bf_t a_s, *r, *a;
   int ret, v;
   JSValue res;
@@ -420,8 +418,8 @@ static int js_unary_arith_bigfloat(JSContext *ctx, JSValue *pres, OPCodeEnum op,
   return 0;
 }
 
-static int js_unary_arith_bigdecimal(JSContext *ctx, JSValue *pres,
-                                     OPCodeEnum op, JSValue op1) {
+int js_unary_arith_bigdecimal(JSContext *ctx, JSValue *pres, OPCodeEnum op,
+                              JSValue op1) {
   bfdec_t *r, *a;
   int ret, v;
   JSValue res;
@@ -466,8 +464,8 @@ static int js_unary_arith_bigdecimal(JSContext *ctx, JSValue *pres,
   return 0;
 }
 
-static no_inline __exception int
-js_unary_arith_slow(JSContext *ctx, JSValue *sp, OPCodeEnum op) {
+no_inline __exception int js_unary_arith_slow(JSContext *ctx, JSValue *sp,
+                                              OPCodeEnum op) {
   JSValue op1, val;
   int v, ret;
   uint32_t tag;
@@ -558,8 +556,7 @@ exception:
   return -1;
 }
 
-static __exception int js_post_inc_slow(JSContext *ctx, JSValue *sp,
-                                        OPCodeEnum op) {
+__exception int js_post_inc_slow(JSContext *ctx, JSValue *sp, OPCodeEnum op) {
   JSValue op1;
 
   /* XXX: allow custom operators */
@@ -574,7 +571,7 @@ static __exception int js_post_inc_slow(JSContext *ctx, JSValue *sp,
   return js_unary_arith_slow(ctx, sp + 1, op - OP_post_dec + OP_dec);
 }
 
-static no_inline int js_not_slow(JSContext *ctx, JSValue *sp) {
+no_inline int js_not_slow(JSContext *ctx, JSValue *sp) {
   JSValue op1, val;
   int ret;
 
@@ -608,8 +605,8 @@ exception:
   return -1;
 }
 
-static int js_binary_arith_bigfloat(JSContext *ctx, OPCodeEnum op,
-                                    JSValue *pres, JSValue op1, JSValue op2) {
+int js_binary_arith_bigfloat(JSContext *ctx, OPCodeEnum op, JSValue *pres,
+                             JSValue op1, JSValue op2) {
   bf_t a_s, b_s, *r, *a, *b;
   int ret;
   JSValue res;
@@ -667,8 +664,8 @@ static int js_binary_arith_bigfloat(JSContext *ctx, OPCodeEnum op,
   return 0;
 }
 
-static int js_binary_arith_bigint(JSContext *ctx, OPCodeEnum op, JSValue *pres,
-                                  JSValue op1, JSValue op2) {
+int js_binary_arith_bigint(JSContext *ctx, OPCodeEnum op, JSValue *pres,
+                           JSValue op1, JSValue op2) {
   bf_t a_s, b_s, *r, *a, *b;
   int ret;
   JSValue res;
@@ -821,7 +818,7 @@ fail:
 }
 
 /* b must be a positive integer */
-static int js_bfdec_pow(bfdec_t *r, const bfdec_t *a, const bfdec_t *b) {
+int js_bfdec_pow(bfdec_t *r, const bfdec_t *a, const bfdec_t *b) {
   bfdec_t b1;
   int32_t b2;
   int ret;
@@ -846,8 +843,8 @@ static int js_bfdec_pow(bfdec_t *r, const bfdec_t *a, const bfdec_t *b) {
   return bfdec_pow_ui(r, a, b2);
 }
 
-static int js_binary_arith_bigdecimal(JSContext *ctx, OPCodeEnum op,
-                                      JSValue *pres, JSValue op1, JSValue op2) {
+int js_binary_arith_bigdecimal(JSContext *ctx, OPCodeEnum op, JSValue *pres,
+                               JSValue op1, JSValue op2) {
   bfdec_t *r, *a, *b;
   int ret;
   JSValue res;
@@ -905,8 +902,8 @@ fail:
   return -1;
 }
 
-static no_inline __exception int
-js_binary_arith_slow(JSContext *ctx, JSValue *sp, OPCodeEnum op) {
+no_inline __exception int js_binary_arith_slow(JSContext *ctx, JSValue *sp,
+                                               OPCodeEnum op) {
   JSValue op1, op2, res;
   uint32_t tag1, tag2;
   int ret;
@@ -1067,7 +1064,7 @@ exception:
   return -1;
 }
 
-static no_inline __exception int js_add_slow(JSContext *ctx, JSValue *sp) {
+no_inline __exception int js_add_slow(JSContext *ctx, JSValue *sp) {
   JSValue op1, op2, res;
   uint32_t tag1, tag2;
   int ret;
@@ -1180,8 +1177,8 @@ exception:
   return -1;
 }
 
-static no_inline __exception int
-js_binary_logic_slow(JSContext *ctx, JSValue *sp, OPCodeEnum op) {
+no_inline __exception int js_binary_logic_slow(JSContext *ctx, JSValue *sp,
+                                               OPCodeEnum op) {
   JSValue op1, op2, res;
   int ret;
   uint32_t tag1, tag2;
@@ -1273,8 +1270,8 @@ exception:
 }
 
 /* Note: also used for bigint */
-static int js_compare_bigfloat(JSContext *ctx, OPCodeEnum op, JSValue op1,
-                               JSValue op2) {
+int js_compare_bigfloat(JSContext *ctx, OPCodeEnum op, JSValue op1,
+                        JSValue op2) {
   bf_t a_s, b_s, *a, *b;
   int res;
 
@@ -1318,8 +1315,8 @@ static int js_compare_bigfloat(JSContext *ctx, OPCodeEnum op, JSValue op1,
   return res;
 }
 
-static int js_compare_bigdecimal(JSContext *ctx, OPCodeEnum op, JSValue op1,
-                                 JSValue op2) {
+int js_compare_bigdecimal(JSContext *ctx, OPCodeEnum op, JSValue op1,
+                          JSValue op2) {
   bfdec_t *a, *b;
   int res;
 
@@ -1363,8 +1360,7 @@ static int js_compare_bigdecimal(JSContext *ctx, OPCodeEnum op, JSValue op1,
   return res;
 }
 
-static no_inline int js_relational_slow(JSContext *ctx, JSValue *sp,
-                                        OPCodeEnum op) {
+no_inline int js_relational_slow(JSContext *ctx, JSValue *sp, OPCodeEnum op) {
   JSValue op1, op2, ret;
   int res;
   uint32_t tag1, tag2;
@@ -1518,8 +1514,7 @@ exception:
   return -1;
 }
 
-static no_inline __exception int js_eq_slow(JSContext *ctx, JSValue *sp,
-                                            BOOL is_neq) {
+no_inline __exception int js_eq_slow(JSContext *ctx, JSValue *sp, BOOL is_neq) {
   JSValue op1, op2, ret;
   int res;
   uint32_t tag1, tag2;
@@ -1674,7 +1669,7 @@ exception:
   return -1;
 }
 
-static no_inline int js_shr_slow(JSContext *ctx, JSValue *sp) {
+no_inline int js_shr_slow(JSContext *ctx, JSValue *sp) {
   JSValue op1, op2;
   uint32_t v1, v2, r;
 

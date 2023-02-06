@@ -4,7 +4,7 @@ target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(quickjs libs)
 
-option(CONFIG_BIGNUM "Enable bignumber support" OFF)
+option(CONFIG_BIGNUM "Enable bignumber support" ON)
 
 if(CONFIG_BIGNUM)
   target_compile_definitions(quickjs PRIVATE CONFIG_BIGNUM=y)

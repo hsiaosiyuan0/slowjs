@@ -1,5 +1,6 @@
 #include "class.h"
 
+#include "num.h"
 #include "str.h"
 
 static JSClassID js_class_id_alloc = JS_CLASS_INIT_COUNT;

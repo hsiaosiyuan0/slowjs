@@ -2,6 +2,7 @@
 #include "parse.h"
 
 #include "vm/error.h"
+#include "vm/num.h"
 
 /* allowed parse_flags: PF_IN_ACCEPTED */
 __exception int js_parse_expr2(JSParseState *s, int parse_flags) {

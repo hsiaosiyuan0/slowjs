@@ -1,5 +1,7 @@
 #include "parse.h"
 
+#include "vm/num.h"
+
 __exception int js_parse_array_literal(JSParseState *s) {
   uint32_t idx;
   BOOL need_length;

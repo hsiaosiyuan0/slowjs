@@ -8,6 +8,7 @@
 #include "instr.h"
 #include "iter.h"
 #include "mod.h"
+#include "num.h"
 #include "obj.h"
 #include "ops.h"
 #include "vm.h"

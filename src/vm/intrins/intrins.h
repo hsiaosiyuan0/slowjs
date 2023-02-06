@@ -204,6 +204,7 @@ extern const JSCFunctionListEntry js_array_iterator_proto_funcs[2];
 
 JSValue js_number_constructor(JSContext *ctx, JSValueConst new_target, int argc,
                               JSValueConst *argv);
+int js_get_radix(JSContext *ctx, JSValueConst val);
 
 extern const JSCFunctionListEntry js_number_proto_funcs[6];
 extern const JSCFunctionListEntry js_number_funcs[14];
@@ -471,6 +472,11 @@ JSValue js___date_clock(JSContext *ctx, JSValueConst this_val, int argc,
                         JSValueConst *argv);
 
 /* -- Operators ----------------------------------- */
+
+/* -- BigDecimal ----------------------------------- */
+
+JSValue JS_ToBigDecimalFree(JSContext *ctx, JSValue val,
+                            BOOL allow_null_or_undefined);
 
 /* -- Typed Arrays ----------------------------------- */
 

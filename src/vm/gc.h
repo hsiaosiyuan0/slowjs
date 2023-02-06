@@ -19,6 +19,9 @@ static inline int js_resize_array(JSContext *ctx, void **parray, int elem_size,
     return 0;
 }
 
+/* called by libbf */
+void *js_bf_realloc(void *opaque, void *ptr, size_t size);
+
 /* -- Garbage collection ----------------------------------- */
 
 static inline void set_value(JSContext *ctx, JSValue *pval, JSValue new_val) {

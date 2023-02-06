@@ -138,7 +138,7 @@ static JSValue js_number_valueOf(JSContext *ctx, JSValueConst this_val,
   return js_thisNumberValue(ctx, this_val);
 }
 
-static int js_get_radix(JSContext *ctx, JSValueConst val) {
+int js_get_radix(JSContext *ctx, JSValueConst val) {
   int radix;
   if (JS_ToInt32Sat(ctx, &radix, val))
     return -1;

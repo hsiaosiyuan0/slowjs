@@ -134,12 +134,19 @@ void js_promise_resolve_function_finalizer(JSRuntime *rt, JSValue val);
 void js_promise_resolve_function_mark(JSRuntime *rt, JSValueConst val,
                                       JS_MarkFunc *mark_func);
 #ifdef CONFIG_BIGNUM
+void js_float_env_finalizer(JSRuntime *rt, JSValue val);
+
 void js_operator_set_finalizer(JSRuntime *rt, JSValue val);
 void js_operator_set_mark(JSRuntime *rt, JSValueConst val,
                           JS_MarkFunc *mark_func);
 #endif
 
+#ifdef CONFIG_BIGNUM
+JSClassShortDef const js_std_class_def[47];
+#else
 JSClassShortDef const js_std_class_def[40];
+#endif
+
 int init_class_range(JSRuntime *rt, JSClassShortDef const *tab, int start,
                      int count);
 

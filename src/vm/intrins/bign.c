@@ -1,10 +1,15 @@
 #include "intrins.h"
 
+#include "vm/conv.h"
+#include "vm/error.h"
+#include "vm/num.h"
+#include "vm/ops.h"
+
 #ifdef CONFIG_BIGNUM
 
-/* Operators */
+/* -- Operators ----------------------------------- */
 
-static void js_operator_set_finalizer(JSRuntime *rt, JSValue val) {
+void js_operator_set_finalizer(JSRuntime *rt, JSValue val) {
   JSOperatorSetData *opset = JS_GetOpaque(val, JS_CLASS_OPERATOR_SET);
   int i, j;
   JSBinaryOperatorDefEntry *ent;
@@ -34,8 +39,8 @@ static void js_operator_set_finalizer(JSRuntime *rt, JSValue val) {
   }
 }
 
-static void js_operator_set_mark(JSRuntime *rt, JSValueConst val,
-                                 JS_MarkFunc *mark_func) {
+void js_operator_set_mark(JSRuntime *rt, JSValueConst val,
+                          JS_MarkFunc *mark_func) {
   JSOperatorSetData *opset = JS_GetOpaque(val, JS_CLASS_OPERATOR_SET);
   int i, j;
   JSBinaryOperatorDefEntry *ent;
@@ -285,7 +290,7 @@ void JS_AddIntrinsicOperators(JSContext *ctx) {
   js_operators_set_default(ctx, ctx->class_proto[JS_CLASS_BIG_DECIMAL]);
 }
 
-/* BigInt */
+/* -- BigInt ----------------------------------- */
 
 static JSValue JS_ToBigIntCtorFree(JSContext *ctx, JSValue val) {
   uint32_t tag;
@@ -609,7 +614,7 @@ void JS_AddIntrinsicBigInt(JSContext *ctx) {
                              countof(js_bigint_funcs));
 }
 
-/* BigFloat */
+/* -- BigFloat ----------------------------------- */
 
 static JSValue js_thisBigFloatValue(JSContext *ctx, JSValueConst this_val) {
   if (JS_IsBigFloat(this_val))
@@ -1244,7 +1249,7 @@ static const JSCFunctionListEntry js_bigfloat_funcs[] = {
     JS_CFUNC_MAGIC_DEF("remainder", 2, js_bigfloat_fop2, MATH_OP_REM),
 };
 
-/* FloatEnv */
+/* -- FloatEnv ----------------------------------- */
 
 static JSValue js_float_env_constructor(JSContext *ctx, JSValueConst new_target,
                                         int argc, JSValueConst *argv) {
@@ -1283,7 +1288,7 @@ static JSValue js_float_env_constructor(JSContext *ctx, JSValueConst new_target,
   return obj;
 }
 
-static void js_float_env_finalizer(JSRuntime *rt, JSValue val) {
+void js_float_env_finalizer(JSRuntime *rt, JSValue val) {
   JSFloatEnv *fe = JS_GetOpaque(val, JS_CLASS_FLOAT_ENV);
   js_free_rt(rt, fe);
 }
@@ -1482,10 +1487,10 @@ void JS_AddIntrinsicBigFloat(JSContext *ctx) {
                              countof(js_float_env_funcs));
 }
 
-/* BigDecimal */
+/* -- BigDecimal ----------------------------------- */
 
-static JSValue JS_ToBigDecimalFree(JSContext *ctx, JSValue val,
-                                   BOOL allow_null_or_undefined) {
+JSValue JS_ToBigDecimalFree(JSContext *ctx, JSValue val,
+                            BOOL allow_null_or_undefined) {
 redo:
   switch (JS_VALUE_GET_NORM_TAG(val)) {
   case JS_TAG_BIG_DECIMAL:

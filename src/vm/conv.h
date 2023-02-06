@@ -30,6 +30,19 @@ const char *JS_ToCStringLen2(JSContext *ctx, size_t *plen, JSValueConst val1,
                              BOOL cesu8);
 void JS_FreeCString(JSContext *ctx, const char *ptr);
 
+JSValue js_dtoa(JSContext *ctx, double d, int radix, int n_digits, int flags);
+
+#ifdef CONFIG_BIGNUM
+JSValue js_bigint_to_string1(JSContext *ctx, JSValueConst val, int radix);
+JSValue js_bigint_to_string(JSContext *ctx, JSValueConst val);
+JSValue js_ftoa(JSContext *ctx, JSValueConst val1, int radix, limb_t prec,
+                bf_flags_t flags);
+JSValue js_bigfloat_to_string(JSContext *ctx, JSValueConst val);
+JSValue js_bigdecimal_to_string1(JSContext *ctx, JSValueConst val, limb_t prec,
+                                 int flags);
+JSValue js_bigdecimal_to_string(JSContext *ctx, JSValueConst val);
+#endif
+
 /* -- ToNumber ----------------------------------- */
 
 #define ATOD_INT_ONLY (1 << 0)
@@ -52,6 +65,13 @@ void JS_FreeCString(JSContext *ctx, const char *ptr);
 #define ATOD_MODE_BIGINT (1 << 9)
 /* accept -0x1 */
 #define ATOD_ACCEPT_PREFIX_AFTER_SIGN (1 << 10)
+
+/* return an exception in case of memory error. Return JS_NAN if
+   invalid syntax */
+#ifdef CONFIG_BIGNUM
+JSValue js_atof2(JSContext *ctx, const char *str, const char **pp, int radix,
+                 int flags, slimb_t *pexponent);
+#endif
 
 JSValue js_atof(JSContext *ctx, const char *str, const char **pp, int radix,
                 int flags);
@@ -94,17 +114,15 @@ static inline int JS_ToFloat64Free(JSContext *ctx, double *pres, JSValue val) {
 int JS_ToInt64Sat(JSContext *ctx, int64_t *pres, JSValueConst val);
 int JS_ToInt64Clamp(JSContext *ctx, int64_t *pres, JSValueConst val,
                     int64_t min, int64_t max, int64_t neg_offset);
-
+int JS_ToInt64SatFree(JSContext *ctx, int64_t *pres, JSValue val);
 int JS_ToIndex(JSContext *ctx, uint64_t *plen, JSValueConst val);
 __exception int JS_ToLengthFree(JSContext *ctx, int64_t *plen, JSValue val);
 __exception int JS_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
                                      JSValue val, BOOL is_array_ctor);
 
-/* Big number */
+/* -- Big number  ----------------------------------- */
 
 int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val);
-
-/* Number to string */
 
 /* radix != 10 is only supported with flags = JS_DTOA_VAR_FORMAT */
 /* use as many digits as necessary */
@@ -116,7 +134,35 @@ int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val);
 /* force exponential notation either in fixed or variable format */
 #define JS_DTOA_FORCE_EXP (1 << 2)
 
-JSValue js_dtoa(JSContext *ctx, double d, int radix, int n_digits, int flags);
+#ifdef CONFIG_BIGNUM
+bf_t *JS_ToBigInt(JSContext *ctx, bf_t *buf, JSValueConst val);
+__maybe_unused JSValue JS_ToBigIntValueFree(JSContext *ctx, JSValue val);
+/* free the bf_t allocated by JS_ToBigInt */
+void JS_FreeBigInt(JSContext *ctx, bf_t *a, bf_t *buf);
+
+/* if the returned bigfloat is allocated it is equal to
+   'buf'. Otherwise it is a pointer to the bigfloat in 'val'. Return
+   NULL in case of error. */
+bf_t *JS_ToBigFloat(JSContext *ctx, bf_t *buf, JSValueConst val);
+/* return NULL if invalid type */
+bfdec_t *JS_ToBigDecimal(JSContext *ctx, JSValueConst val);
+/* return NaN if bad bigint literal */
+JSValue JS_StringToBigInt(JSContext *ctx, JSValue val);
+JSValue JS_StringToBigIntErr(JSContext *ctx, JSValue val);
+/* if the returned bigfloat is allocated it is equal to
+   'buf'. Otherwise it is a pointer to the bigfloat in 'val'. */
+bf_t *JS_ToBigIntFree(JSContext *ctx, bf_t *buf, JSValue val);
+
+/* XXX: merge with JS_ToInt64Free with a specific flag */
+int JS_ToBigInt64Free(JSContext *ctx, int64_t *pres, JSValue val);
+
+JSValue js_string_to_bigint(JSContext *ctx, const char *buf, int radix,
+                            int flags, slimb_t *pexponent);
+JSValue js_string_to_bigfloat(JSContext *ctx, const char *buf, int radix,
+                              int flags, slimb_t *pexponent);
+JSValue js_string_to_bigdecimal(JSContext *ctx, const char *buf, int radix,
+                                int flags, slimb_t *pexponent);
+#endif
 
 /* -- ToBool ----------------------------------- */
 

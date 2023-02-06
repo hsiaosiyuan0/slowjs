@@ -5,6 +5,7 @@
 #include "num.h"
 #include "obj.h"
 #include "str.h"
+#include "vm.h"
 
 /* -- ToPrimitive ----------------------------------- */
 
@@ -193,8 +194,8 @@ static double js_strtod(const char *p, int radix, BOOL is_float) {
 }
 
 #ifdef CONFIG_BIGNUM
-static JSValue js_string_to_bigint(JSContext *ctx, const char *buf, int radix,
-                                   int flags, slimb_t *pexponent) {
+JSValue js_string_to_bigint(JSContext *ctx, const char *buf, int radix,
+                            int flags, slimb_t *pexponent) {
   bf_t a_s, *a = &a_s;
   int ret;
   JSValue val;
@@ -211,8 +212,8 @@ static JSValue js_string_to_bigint(JSContext *ctx, const char *buf, int radix,
   return val;
 }
 
-static JSValue js_string_to_bigfloat(JSContext *ctx, const char *buf, int radix,
-                                     int flags, slimb_t *pexponent) {
+JSValue js_string_to_bigfloat(JSContext *ctx, const char *buf, int radix,
+                              int flags, slimb_t *pexponent) {
   bf_t *a;
   int ret;
   JSValue val;
@@ -235,9 +236,8 @@ static JSValue js_string_to_bigfloat(JSContext *ctx, const char *buf, int radix,
   return val;
 }
 
-static JSValue js_string_to_bigdecimal(JSContext *ctx, const char *buf,
-                                       int radix, int flags,
-                                       slimb_t *pexponent) {
+JSValue js_string_to_bigdecimal(JSContext *ctx, const char *buf, int radix,
+                                int flags, slimb_t *pexponent) {
   bfdec_t *a;
   int ret;
   JSValue val;
@@ -259,8 +259,8 @@ static JSValue js_string_to_bigdecimal(JSContext *ctx, const char *buf,
 /* return an exception in case of memory error. Return JS_NAN if
    invalid syntax */
 #ifdef CONFIG_BIGNUM
-static JSValue js_atof2(JSContext *ctx, const char *str, const char **pp,
-                        int radix, int flags, slimb_t *pexponent)
+JSValue js_atof2(JSContext *ctx, const char *str, const char **pp, int radix,
+                 int flags, slimb_t *pexponent)
 #else
 JSValue js_atof(JSContext *ctx, const char *str, const char **pp, int radix,
                 int flags)
@@ -644,6 +644,230 @@ JSValue JS_ToNumber(JSContext *ctx, JSValueConst val) {
   return JS_ToNumberFree(ctx, JS_DupValue(ctx, val));
 }
 
+#ifdef CONFIG_BIGNUM
+/* if the returned bigfloat is allocated it is equal to
+   'buf'. Otherwise it is a pointer to the bigfloat in 'val'. Return
+   NULL in case of error. */
+bf_t *JS_ToBigFloat(JSContext *ctx, bf_t *buf, JSValueConst val) {
+  uint32_t tag;
+  bf_t *r;
+  JSBigFloat *p;
+
+  tag = JS_VALUE_GET_NORM_TAG(val);
+  switch (tag) {
+  case JS_TAG_INT:
+  case JS_TAG_BOOL:
+  case JS_TAG_NULL:
+    r = buf;
+    bf_init(ctx->bf_ctx, r);
+    if (bf_set_si(r, JS_VALUE_GET_INT(val)))
+      goto fail;
+    break;
+  case JS_TAG_FLOAT64:
+    r = buf;
+    bf_init(ctx->bf_ctx, r);
+    if (bf_set_float64(r, JS_VALUE_GET_FLOAT64(val))) {
+    fail:
+      bf_delete(r);
+      return NULL;
+    }
+    break;
+  case JS_TAG_BIG_INT:
+  case JS_TAG_BIG_FLOAT:
+    p = JS_VALUE_GET_PTR(val);
+    r = &p->num;
+    break;
+  case JS_TAG_UNDEFINED:
+  default:
+    r = buf;
+    bf_init(ctx->bf_ctx, r);
+    bf_set_nan(r);
+    break;
+  }
+  return r;
+}
+
+/* return NULL if invalid type */
+bfdec_t *JS_ToBigDecimal(JSContext *ctx, JSValueConst val) {
+  uint32_t tag;
+  JSBigDecimal *p;
+  bfdec_t *r;
+
+  tag = JS_VALUE_GET_NORM_TAG(val);
+  switch (tag) {
+  case JS_TAG_BIG_DECIMAL:
+    p = JS_VALUE_GET_PTR(val);
+    r = &p->num;
+    break;
+  default:
+    JS_ThrowTypeError(ctx, "bigdecimal expected");
+    r = NULL;
+    break;
+  }
+  return r;
+}
+
+/* return NaN if bad bigint literal */
+JSValue JS_StringToBigInt(JSContext *ctx, JSValue val) {
+  const char *str, *p;
+  size_t len;
+  int flags;
+
+  str = JS_ToCStringLen(ctx, &len, val);
+  JS_FreeValue(ctx, val);
+  if (!str)
+    return JS_EXCEPTION;
+  p = str;
+  p += skip_spaces(p);
+  if ((p - str) == len) {
+    val = JS_NewBigInt64(ctx, 0);
+  } else {
+    flags = ATOD_INT_ONLY | ATOD_ACCEPT_BIN_OCT | ATOD_TYPE_BIG_INT;
+    if (is_math_mode(ctx))
+      flags |= ATOD_MODE_BIGINT;
+    val = js_atof(ctx, p, &p, 0, flags);
+    p += skip_spaces(p);
+    if (!JS_IsException(val)) {
+      if ((p - str) != len) {
+        JS_FreeValue(ctx, val);
+        val = JS_NAN;
+      }
+    }
+  }
+  JS_FreeCString(ctx, str);
+  return val;
+}
+
+JSValue JS_StringToBigIntErr(JSContext *ctx, JSValue val) {
+  val = JS_StringToBigInt(ctx, val);
+  if (JS_VALUE_IS_NAN(val))
+    return JS_ThrowSyntaxError(ctx, "invalid bigint literal");
+  return val;
+}
+
+/* if the returned bigfloat is allocated it is equal to
+   'buf'. Otherwise it is a pointer to the bigfloat in 'val'. */
+bf_t *JS_ToBigIntFree(JSContext *ctx, bf_t *buf, JSValue val) {
+  uint32_t tag;
+  bf_t *r;
+  JSBigFloat *p;
+
+redo:
+  tag = JS_VALUE_GET_NORM_TAG(val);
+  switch (tag) {
+  case JS_TAG_INT:
+  case JS_TAG_NULL:
+  case JS_TAG_UNDEFINED:
+    if (!is_math_mode(ctx))
+      goto fail;
+    /* fall tru */
+  case JS_TAG_BOOL:
+    r = buf;
+    bf_init(ctx->bf_ctx, r);
+    bf_set_si(r, JS_VALUE_GET_INT(val));
+    break;
+  case JS_TAG_FLOAT64: {
+    double d = JS_VALUE_GET_FLOAT64(val);
+    if (!is_math_mode(ctx))
+      goto fail;
+    if (!isfinite(d))
+      goto fail;
+    r = buf;
+    bf_init(ctx->bf_ctx, r);
+    d = trunc(d);
+    bf_set_float64(r, d);
+  } break;
+  case JS_TAG_BIG_INT:
+    p = JS_VALUE_GET_PTR(val);
+    r = &p->num;
+    break;
+  case JS_TAG_BIG_FLOAT:
+    if (!is_math_mode(ctx))
+      goto fail;
+    p = JS_VALUE_GET_PTR(val);
+    if (!bf_is_finite(&p->num))
+      goto fail;
+    r = buf;
+    bf_init(ctx->bf_ctx, r);
+    bf_set(r, &p->num);
+    bf_rint(r, BF_RNDZ);
+    JS_FreeValue(ctx, val);
+    break;
+  case JS_TAG_STRING:
+    val = JS_StringToBigIntErr(ctx, val);
+    if (JS_IsException(val))
+      return NULL;
+    goto redo;
+  case JS_TAG_OBJECT:
+    val = JS_ToPrimitiveFree(ctx, val, HINT_NUMBER);
+    if (JS_IsException(val))
+      return NULL;
+    goto redo;
+  default:
+  fail:
+    JS_FreeValue(ctx, val);
+    JS_ThrowTypeError(ctx, "cannot convert to bigint");
+    return NULL;
+  }
+  return r;
+}
+
+bf_t *JS_ToBigInt(JSContext *ctx, bf_t *buf, JSValueConst val) {
+  return JS_ToBigIntFree(ctx, buf, JS_DupValue(ctx, val));
+}
+
+__maybe_unused JSValue JS_ToBigIntValueFree(JSContext *ctx, JSValue val) {
+  if (JS_VALUE_GET_TAG(val) == JS_TAG_BIG_INT) {
+    return val;
+  } else {
+    bf_t a_s, *a, *r;
+    int ret;
+    JSValue res;
+
+    res = JS_NewBigInt(ctx);
+    if (JS_IsException(res))
+      return JS_EXCEPTION;
+    a = JS_ToBigIntFree(ctx, &a_s, val);
+    if (!a) {
+      JS_FreeValue(ctx, res);
+      return JS_EXCEPTION;
+    }
+    r = JS_GetBigInt(res);
+    ret = bf_set(r, a);
+    JS_FreeBigInt(ctx, a, &a_s);
+    if (ret) {
+      JS_FreeValue(ctx, res);
+      return JS_ThrowOutOfMemory(ctx);
+    }
+    return JS_CompactBigInt(ctx, res);
+  }
+}
+
+/* free the bf_t allocated by JS_ToBigInt */
+void JS_FreeBigInt(JSContext *ctx, bf_t *a, bf_t *buf) {
+  if (a == buf) {
+    bf_delete(a);
+  } else {
+    JSBigFloat *p = (JSBigFloat *)((uint8_t *)a - offsetof(JSBigFloat, num));
+    JS_FreeValue(ctx, JS_MKPTR(JS_TAG_BIG_FLOAT, p));
+  }
+}
+
+/* XXX: merge with JS_ToInt64Free with a specific flag */
+int JS_ToBigInt64Free(JSContext *ctx, int64_t *pres, JSValue val) {
+  bf_t a_s, *a;
+
+  a = JS_ToBigIntFree(ctx, &a_s, val);
+  if (!a) {
+    *pres = 0;
+    return -1;
+  }
+  bf_get_int64(pres, a, BF_GET_INT_MOD);
+  JS_FreeBigInt(ctx, a, &a_s);
+  return 0;
+}
+#endif
+
 /* same as JS_ToNumber() but return 0 in case of NaN/Undefined */
 __maybe_unused JSValue JS_ToIntegerFree(JSContext *ctx, JSValue val) {
   uint32_t tag;
@@ -772,7 +996,7 @@ int JS_ToInt32Clamp(JSContext *ctx, int *pres, JSValueConst val, int min,
   return res;
 }
 
-static int JS_ToInt64SatFree(JSContext *ctx, int64_t *pres, JSValue val) {
+int JS_ToInt64SatFree(JSContext *ctx, int64_t *pres, JSValue val) {
   uint32_t tag;
 
 redo:
@@ -1115,262 +1339,11 @@ __exception int JS_ToLengthFree(JSContext *ctx, int64_t *plen, JSValue val) {
   return res;
 }
 
-/* buf1 contains the printf result */
-static void js_ecvt1(double d, int n_digits, int *decpt, int *sign, char *buf,
-                     int rounding_mode, char *buf1, int buf1_size) {
-  if (rounding_mode != FE_TONEAREST)
-    fesetround(rounding_mode);
-  snprintf(buf1, buf1_size, "%+.*e", n_digits - 1, d);
-  if (rounding_mode != FE_TONEAREST)
-    fesetround(FE_TONEAREST);
-  *sign = (buf1[0] == '-');
-  /* mantissa */
-  buf[0] = buf1[1];
-  if (n_digits > 1)
-    memcpy(buf + 1, buf1 + 3, n_digits - 1);
-  buf[n_digits] = '\0';
-  /* exponent */
-  *decpt = atoi(buf1 + n_digits + 2 + (n_digits > 1)) + 1;
-}
-
-/* maximum buffer size for js_dtoa */
-#define JS_DTOA_BUF_SIZE 128
-
-/* needed because ecvt usually limits the number of digits to
-   17. Return the number of digits. */
-static int js_ecvt(double d, int n_digits, int *decpt, int *sign, char *buf,
-                   BOOL is_fixed) {
-  int rounding_mode;
-  char buf_tmp[JS_DTOA_BUF_SIZE];
-
-  if (!is_fixed) {
-    unsigned int n_digits_min, n_digits_max;
-    /* find the minimum amount of digits (XXX: inefficient but simple) */
-    n_digits_min = 1;
-    n_digits_max = 17;
-    while (n_digits_min < n_digits_max) {
-      n_digits = (n_digits_min + n_digits_max) / 2;
-      js_ecvt1(d, n_digits, decpt, sign, buf, FE_TONEAREST, buf_tmp,
-               sizeof(buf_tmp));
-      if (strtod(buf_tmp, NULL) == d) {
-        /* no need to keep the trailing zeros */
-        while (n_digits >= 2 && buf[n_digits - 1] == '0')
-          n_digits--;
-        n_digits_max = n_digits;
-      } else {
-        n_digits_min = n_digits + 1;
-      }
-    }
-    n_digits = n_digits_max;
-    rounding_mode = FE_TONEAREST;
-  } else {
-    rounding_mode = FE_TONEAREST;
-#ifdef CONFIG_PRINTF_RNDN
-    {
-      char buf1[JS_DTOA_BUF_SIZE], buf2[JS_DTOA_BUF_SIZE];
-      int decpt1, sign1, decpt2, sign2;
-      /* The JS rounding is specified as round to nearest ties away
-         from zero (RNDNA), but in printf the "ties" case is not
-         specified (for example it is RNDN for glibc, RNDNA for
-         Windows), so we must round manually. */
-      js_ecvt1(d, n_digits + 1, &decpt1, &sign1, buf1, FE_TONEAREST, buf_tmp,
-               sizeof(buf_tmp));
-      /* XXX: could use 2 digits to reduce the average running time */
-      if (buf1[n_digits] == '5') {
-        js_ecvt1(d, n_digits + 1, &decpt1, &sign1, buf1, FE_DOWNWARD, buf_tmp,
-                 sizeof(buf_tmp));
-        js_ecvt1(d, n_digits + 1, &decpt2, &sign2, buf2, FE_UPWARD, buf_tmp,
-                 sizeof(buf_tmp));
-        if (memcmp(buf1, buf2, n_digits + 1) == 0 && decpt1 == decpt2) {
-          /* exact result: round away from zero */
-          if (sign1)
-            rounding_mode = FE_DOWNWARD;
-          else
-            rounding_mode = FE_UPWARD;
-        }
-      }
-    }
-#endif /* CONFIG_PRINTF_RNDN */
-  }
-  js_ecvt1(d, n_digits, decpt, sign, buf, rounding_mode, buf_tmp,
-           sizeof(buf_tmp));
-  return n_digits;
-}
-
-static int js_fcvt1(char *buf, int buf_size, double d, int n_digits,
-                    int rounding_mode) {
-  int n;
-  if (rounding_mode != FE_TONEAREST)
-    fesetround(rounding_mode);
-  n = snprintf(buf, buf_size, "%.*f", n_digits, d);
-  if (rounding_mode != FE_TONEAREST)
-    fesetround(FE_TONEAREST);
-  assert(n < buf_size);
-  return n;
-}
-
-static void js_fcvt(char *buf, int buf_size, double d, int n_digits) {
-  int rounding_mode;
-  rounding_mode = FE_TONEAREST;
-#ifdef CONFIG_PRINTF_RNDN
-  {
-    int n1, n2;
-    char buf1[JS_DTOA_BUF_SIZE];
-    char buf2[JS_DTOA_BUF_SIZE];
-
-    /* The JS rounding is specified as round to nearest ties away from
-       zero (RNDNA), but in printf the "ties" case is not specified
-       (for example it is RNDN for glibc, RNDNA for Windows), so we
-       must round manually. */
-    n1 = js_fcvt1(buf1, sizeof(buf1), d, n_digits + 1, FE_TONEAREST);
-    rounding_mode = FE_TONEAREST;
-    /* XXX: could use 2 digits to reduce the average running time */
-    if (buf1[n1 - 1] == '5') {
-      n1 = js_fcvt1(buf1, sizeof(buf1), d, n_digits + 1, FE_DOWNWARD);
-      n2 = js_fcvt1(buf2, sizeof(buf2), d, n_digits + 1, FE_UPWARD);
-      if (n1 == n2 && memcmp(buf1, buf2, n1) == 0) {
-        /* exact result: round away from zero */
-        if (buf1[0] == '-')
-          rounding_mode = FE_DOWNWARD;
-        else
-          rounding_mode = FE_UPWARD;
-      }
-    }
-  }
-#endif /* CONFIG_PRINTF_RNDN */
-  js_fcvt1(buf, buf_size, d, n_digits, rounding_mode);
-}
-
-/* 2 <= base <= 36 */
-static char *i64toa(char *buf_end, int64_t n, unsigned int base) {
-  char *q = buf_end;
-  int digit, is_neg;
-
-  is_neg = 0;
-  if (n < 0) {
-    is_neg = 1;
-    n = -n;
-  }
-  *--q = '\0';
-  do {
-    digit = (uint64_t)n % base;
-    n = (uint64_t)n / base;
-    if (digit < 10)
-      digit += '0';
-    else
-      digit += 'a' - 10;
-    *--q = digit;
-  } while (n != 0);
-  if (is_neg)
-    *--q = '-';
-  return q;
-}
-
-/* XXX: slow and maybe not fully correct. Use libbf when it is fast enough.
-   XXX: radix != 10 is only supported for small integers
-*/
-void js_dtoa1(char *buf, double d, int radix, int n_digits, int flags) {
-  char *q;
-
-  if (!isfinite(d)) {
-    if (isnan(d)) {
-      strcpy(buf, "NaN");
-    } else {
-      q = buf;
-      if (d < 0)
-        *q++ = '-';
-      strcpy(q, "Infinity");
-    }
-  } else if (flags == JS_DTOA_VAR_FORMAT) {
-    int64_t i64;
-    char buf1[70], *ptr;
-    i64 = (int64_t)d;
-    if (d != i64 || i64 > MAX_SAFE_INTEGER || i64 < -MAX_SAFE_INTEGER)
-      goto generic_conv;
-    /* fast path for integers */
-    ptr = i64toa(buf1 + sizeof(buf1), i64, radix);
-    strcpy(buf, ptr);
-  } else {
-    if (d == 0.0)
-      d = 0.0; /* convert -0 to 0 */
-    if (flags == JS_DTOA_FRAC_FORMAT) {
-      js_fcvt(buf, JS_DTOA_BUF_SIZE, d, n_digits);
-    } else {
-      char buf1[JS_DTOA_BUF_SIZE];
-      int sign, decpt, k, n, i, p, n_max;
-      BOOL is_fixed;
-    generic_conv:
-      is_fixed = ((flags & 3) == JS_DTOA_FIXED_FORMAT);
-      if (is_fixed) {
-        n_max = n_digits;
-      } else {
-        n_max = 21;
-      }
-      /* the number has k digits (k >= 1) */
-      k = js_ecvt(d, n_digits, &decpt, &sign, buf1, is_fixed);
-      n = decpt; /* d=10^(n-k)*(buf1) i.e. d= < x.yyyy 10^(n-1) */
-      q = buf;
-      if (sign)
-        *q++ = '-';
-      if (flags & JS_DTOA_FORCE_EXP)
-        goto force_exp;
-      if (n >= 1 && n <= n_max) {
-        if (k <= n) {
-          memcpy(q, buf1, k);
-          q += k;
-          for (i = 0; i < (n - k); i++)
-            *q++ = '0';
-          *q = '\0';
-        } else {
-          /* k > n */
-          memcpy(q, buf1, n);
-          q += n;
-          *q++ = '.';
-          for (i = 0; i < (k - n); i++)
-            *q++ = buf1[n + i];
-          *q = '\0';
-        }
-      } else if (n >= -5 && n <= 0) {
-        *q++ = '0';
-        *q++ = '.';
-        for (i = 0; i < -n; i++)
-          *q++ = '0';
-        memcpy(q, buf1, k);
-        q += k;
-        *q = '\0';
-      } else {
-      force_exp:
-        /* exponential notation */
-        *q++ = buf1[0];
-        if (k > 1) {
-          *q++ = '.';
-          for (i = 1; i < k; i++)
-            *q++ = buf1[i];
-        }
-        *q++ = 'e';
-        p = n - 1;
-        if (p >= 0)
-          *q++ = '+';
-        sprintf(q, "%d", p);
-      }
-    }
-  }
-}
-
-JSValue js_dtoa(JSContext *ctx, double d, int radix, int n_digits, int flags) {
-  char buf[JS_DTOA_BUF_SIZE];
-  js_dtoa1(buf, d, radix, n_digits, flags);
-  return JS_NewString(ctx, buf);
-}
-
 #ifdef CONFIG_BIGNUM
-
 int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val) {
   return JS_ToBigInt64Free(ctx, pres, JS_DupValue(ctx, val));
 }
-
 #else
-
 int JS_ToBigInt64(JSContext *ctx, int64_t *pres, JSValueConst val) {
   JS_ThrowUnsupportedBigint(ctx);
   *pres = 0;
@@ -1642,6 +1615,366 @@ void JS_FreeCString(JSContext *ctx, const char *ptr) {
   p = (JSString *)(void *)(ptr - offsetof(JSString, u));
   JS_FreeValue(ctx, JS_MKPTR(JS_TAG_STRING, p));
 }
+
+/* buf1 contains the printf result */
+static void js_ecvt1(double d, int n_digits, int *decpt, int *sign, char *buf,
+                     int rounding_mode, char *buf1, int buf1_size) {
+  if (rounding_mode != FE_TONEAREST)
+    fesetround(rounding_mode);
+  snprintf(buf1, buf1_size, "%+.*e", n_digits - 1, d);
+  if (rounding_mode != FE_TONEAREST)
+    fesetround(FE_TONEAREST);
+  *sign = (buf1[0] == '-');
+  /* mantissa */
+  buf[0] = buf1[1];
+  if (n_digits > 1)
+    memcpy(buf + 1, buf1 + 3, n_digits - 1);
+  buf[n_digits] = '\0';
+  /* exponent */
+  *decpt = atoi(buf1 + n_digits + 2 + (n_digits > 1)) + 1;
+}
+
+/* maximum buffer size for js_dtoa */
+#define JS_DTOA_BUF_SIZE 128
+
+/* needed because ecvt usually limits the number of digits to
+   17. Return the number of digits. */
+static int js_ecvt(double d, int n_digits, int *decpt, int *sign, char *buf,
+                   BOOL is_fixed) {
+  int rounding_mode;
+  char buf_tmp[JS_DTOA_BUF_SIZE];
+
+  if (!is_fixed) {
+    unsigned int n_digits_min, n_digits_max;
+    /* find the minimum amount of digits (XXX: inefficient but simple) */
+    n_digits_min = 1;
+    n_digits_max = 17;
+    while (n_digits_min < n_digits_max) {
+      n_digits = (n_digits_min + n_digits_max) / 2;
+      js_ecvt1(d, n_digits, decpt, sign, buf, FE_TONEAREST, buf_tmp,
+               sizeof(buf_tmp));
+      if (strtod(buf_tmp, NULL) == d) {
+        /* no need to keep the trailing zeros */
+        while (n_digits >= 2 && buf[n_digits - 1] == '0')
+          n_digits--;
+        n_digits_max = n_digits;
+      } else {
+        n_digits_min = n_digits + 1;
+      }
+    }
+    n_digits = n_digits_max;
+    rounding_mode = FE_TONEAREST;
+  } else {
+    rounding_mode = FE_TONEAREST;
+#ifdef CONFIG_PRINTF_RNDN
+    {
+      char buf1[JS_DTOA_BUF_SIZE], buf2[JS_DTOA_BUF_SIZE];
+      int decpt1, sign1, decpt2, sign2;
+      /* The JS rounding is specified as round to nearest ties away
+         from zero (RNDNA), but in printf the "ties" case is not
+         specified (for example it is RNDN for glibc, RNDNA for
+         Windows), so we must round manually. */
+      js_ecvt1(d, n_digits + 1, &decpt1, &sign1, buf1, FE_TONEAREST, buf_tmp,
+               sizeof(buf_tmp));
+      /* XXX: could use 2 digits to reduce the average running time */
+      if (buf1[n_digits] == '5') {
+        js_ecvt1(d, n_digits + 1, &decpt1, &sign1, buf1, FE_DOWNWARD, buf_tmp,
+                 sizeof(buf_tmp));
+        js_ecvt1(d, n_digits + 1, &decpt2, &sign2, buf2, FE_UPWARD, buf_tmp,
+                 sizeof(buf_tmp));
+        if (memcmp(buf1, buf2, n_digits + 1) == 0 && decpt1 == decpt2) {
+          /* exact result: round away from zero */
+          if (sign1)
+            rounding_mode = FE_DOWNWARD;
+          else
+            rounding_mode = FE_UPWARD;
+        }
+      }
+    }
+#endif /* CONFIG_PRINTF_RNDN */
+  }
+  js_ecvt1(d, n_digits, decpt, sign, buf, rounding_mode, buf_tmp,
+           sizeof(buf_tmp));
+  return n_digits;
+}
+
+static int js_fcvt1(char *buf, int buf_size, double d, int n_digits,
+                    int rounding_mode) {
+  int n;
+  if (rounding_mode != FE_TONEAREST)
+    fesetround(rounding_mode);
+  n = snprintf(buf, buf_size, "%.*f", n_digits, d);
+  if (rounding_mode != FE_TONEAREST)
+    fesetround(FE_TONEAREST);
+  assert(n < buf_size);
+  return n;
+}
+
+static void js_fcvt(char *buf, int buf_size, double d, int n_digits) {
+  int rounding_mode;
+  rounding_mode = FE_TONEAREST;
+#ifdef CONFIG_PRINTF_RNDN
+  {
+    int n1, n2;
+    char buf1[JS_DTOA_BUF_SIZE];
+    char buf2[JS_DTOA_BUF_SIZE];
+
+    /* The JS rounding is specified as round to nearest ties away from
+       zero (RNDNA), but in printf the "ties" case is not specified
+       (for example it is RNDN for glibc, RNDNA for Windows), so we
+       must round manually. */
+    n1 = js_fcvt1(buf1, sizeof(buf1), d, n_digits + 1, FE_TONEAREST);
+    rounding_mode = FE_TONEAREST;
+    /* XXX: could use 2 digits to reduce the average running time */
+    if (buf1[n1 - 1] == '5') {
+      n1 = js_fcvt1(buf1, sizeof(buf1), d, n_digits + 1, FE_DOWNWARD);
+      n2 = js_fcvt1(buf2, sizeof(buf2), d, n_digits + 1, FE_UPWARD);
+      if (n1 == n2 && memcmp(buf1, buf2, n1) == 0) {
+        /* exact result: round away from zero */
+        if (buf1[0] == '-')
+          rounding_mode = FE_DOWNWARD;
+        else
+          rounding_mode = FE_UPWARD;
+      }
+    }
+  }
+#endif /* CONFIG_PRINTF_RNDN */
+  js_fcvt1(buf, buf_size, d, n_digits, rounding_mode);
+}
+
+/* 2 <= base <= 36 */
+static char *i64toa(char *buf_end, int64_t n, unsigned int base) {
+  char *q = buf_end;
+  int digit, is_neg;
+
+  is_neg = 0;
+  if (n < 0) {
+    is_neg = 1;
+    n = -n;
+  }
+  *--q = '\0';
+  do {
+    digit = (uint64_t)n % base;
+    n = (uint64_t)n / base;
+    if (digit < 10)
+      digit += '0';
+    else
+      digit += 'a' - 10;
+    *--q = digit;
+  } while (n != 0);
+  if (is_neg)
+    *--q = '-';
+  return q;
+}
+
+/* XXX: slow and maybe not fully correct. Use libbf when it is fast enough.
+   XXX: radix != 10 is only supported for small integers
+*/
+void js_dtoa1(char *buf, double d, int radix, int n_digits, int flags) {
+  char *q;
+
+  if (!isfinite(d)) {
+    if (isnan(d)) {
+      strcpy(buf, "NaN");
+    } else {
+      q = buf;
+      if (d < 0)
+        *q++ = '-';
+      strcpy(q, "Infinity");
+    }
+  } else if (flags == JS_DTOA_VAR_FORMAT) {
+    int64_t i64;
+    char buf1[70], *ptr;
+    i64 = (int64_t)d;
+    if (d != i64 || i64 > MAX_SAFE_INTEGER || i64 < -MAX_SAFE_INTEGER)
+      goto generic_conv;
+    /* fast path for integers */
+    ptr = i64toa(buf1 + sizeof(buf1), i64, radix);
+    strcpy(buf, ptr);
+  } else {
+    if (d == 0.0)
+      d = 0.0; /* convert -0 to 0 */
+    if (flags == JS_DTOA_FRAC_FORMAT) {
+      js_fcvt(buf, JS_DTOA_BUF_SIZE, d, n_digits);
+    } else {
+      char buf1[JS_DTOA_BUF_SIZE];
+      int sign, decpt, k, n, i, p, n_max;
+      BOOL is_fixed;
+    generic_conv:
+      is_fixed = ((flags & 3) == JS_DTOA_FIXED_FORMAT);
+      if (is_fixed) {
+        n_max = n_digits;
+      } else {
+        n_max = 21;
+      }
+      /* the number has k digits (k >= 1) */
+      k = js_ecvt(d, n_digits, &decpt, &sign, buf1, is_fixed);
+      n = decpt; /* d=10^(n-k)*(buf1) i.e. d= < x.yyyy 10^(n-1) */
+      q = buf;
+      if (sign)
+        *q++ = '-';
+      if (flags & JS_DTOA_FORCE_EXP)
+        goto force_exp;
+      if (n >= 1 && n <= n_max) {
+        if (k <= n) {
+          memcpy(q, buf1, k);
+          q += k;
+          for (i = 0; i < (n - k); i++)
+            *q++ = '0';
+          *q = '\0';
+        } else {
+          /* k > n */
+          memcpy(q, buf1, n);
+          q += n;
+          *q++ = '.';
+          for (i = 0; i < (k - n); i++)
+            *q++ = buf1[n + i];
+          *q = '\0';
+        }
+      } else if (n >= -5 && n <= 0) {
+        *q++ = '0';
+        *q++ = '.';
+        for (i = 0; i < -n; i++)
+          *q++ = '0';
+        memcpy(q, buf1, k);
+        q += k;
+        *q = '\0';
+      } else {
+      force_exp:
+        /* exponential notation */
+        *q++ = buf1[0];
+        if (k > 1) {
+          *q++ = '.';
+          for (i = 1; i < k; i++)
+            *q++ = buf1[i];
+        }
+        *q++ = 'e';
+        p = n - 1;
+        if (p >= 0)
+          *q++ = '+';
+        sprintf(q, "%d", p);
+      }
+    }
+  }
+}
+
+JSValue js_dtoa(JSContext *ctx, double d, int radix, int n_digits, int flags) {
+  char buf[JS_DTOA_BUF_SIZE];
+  js_dtoa1(buf, d, radix, n_digits, flags);
+  return JS_NewString(ctx, buf);
+}
+
+#ifdef CONFIG_BIGNUM
+
+JSValue js_bigint_to_string1(JSContext *ctx, JSValueConst val, int radix) {
+  JSValue ret;
+  bf_t a_s, *a;
+  char *str;
+  int saved_sign;
+
+  a = JS_ToBigInt(ctx, &a_s, val);
+  if (!a)
+    return JS_EXCEPTION;
+  saved_sign = a->sign;
+  if (a->expn == BF_EXP_ZERO)
+    a->sign = 0;
+  str = bf_ftoa(NULL, a, radix, 0,
+                BF_RNDZ | BF_FTOA_FORMAT_FRAC | BF_FTOA_JS_QUIRKS);
+  a->sign = saved_sign;
+  JS_FreeBigInt(ctx, a, &a_s);
+  if (!str)
+    return JS_ThrowOutOfMemory(ctx);
+  ret = JS_NewString(ctx, str);
+  bf_free(ctx->bf_ctx, str);
+  return ret;
+}
+
+JSValue js_bigint_to_string(JSContext *ctx, JSValueConst val) {
+  return js_bigint_to_string1(ctx, val, 10);
+}
+
+JSValue js_ftoa(JSContext *ctx, JSValueConst val1, int radix, limb_t prec,
+                bf_flags_t flags) {
+  JSValue val, ret;
+  bf_t a_s, *a;
+  char *str;
+  int saved_sign;
+
+  val = JS_ToNumeric(ctx, val1);
+  if (JS_IsException(val))
+    return val;
+  a = JS_ToBigFloat(ctx, &a_s, val);
+  saved_sign = a->sign;
+  if (a->expn == BF_EXP_ZERO)
+    a->sign = 0;
+  flags |= BF_FTOA_JS_QUIRKS;
+  if ((flags & BF_FTOA_FORMAT_MASK) == BF_FTOA_FORMAT_FREE_MIN) {
+    /* Note: for floating point numbers with a radix which is not
+       a power of two, the current precision is used to compute
+       the number of digits. */
+    if ((radix & (radix - 1)) != 0) {
+      bf_t r_s, *r = &r_s;
+      int prec, flags1;
+      /* must round first */
+      if (JS_VALUE_GET_TAG(val) == JS_TAG_BIG_FLOAT) {
+        prec = ctx->fp_env.prec;
+        flags1 = ctx->fp_env.flags &
+                 (BF_FLAG_SUBNORMAL | (BF_EXP_BITS_MASK << BF_EXP_BITS_SHIFT));
+      } else {
+        prec = 53;
+        flags1 = bf_set_exp_bits(11) | BF_FLAG_SUBNORMAL;
+      }
+      bf_init(ctx->bf_ctx, r);
+      bf_set(r, a);
+      bf_round(r, prec, flags1 | BF_RNDN);
+      str = bf_ftoa(NULL, r, radix, prec, flags1 | flags);
+      bf_delete(r);
+    } else {
+      str = bf_ftoa(NULL, a, radix, BF_PREC_INF, flags);
+    }
+  } else {
+    str = bf_ftoa(NULL, a, radix, prec, flags);
+  }
+  a->sign = saved_sign;
+  if (a == &a_s)
+    bf_delete(a);
+  JS_FreeValue(ctx, val);
+  if (!str)
+    return JS_ThrowOutOfMemory(ctx);
+  ret = JS_NewString(ctx, str);
+  bf_free(ctx->bf_ctx, str);
+  return ret;
+}
+
+JSValue js_bigfloat_to_string(JSContext *ctx, JSValueConst val) {
+  return js_ftoa(ctx, val, 10, 0, BF_RNDN | BF_FTOA_FORMAT_FREE_MIN);
+}
+
+JSValue js_bigdecimal_to_string1(JSContext *ctx, JSValueConst val, limb_t prec,
+                                 int flags) {
+  JSValue ret;
+  bfdec_t *a;
+  char *str;
+  int saved_sign;
+
+  a = JS_ToBigDecimal(ctx, val);
+  saved_sign = a->sign;
+  if (a->expn == BF_EXP_ZERO)
+    a->sign = 0;
+  str = bfdec_ftoa(NULL, a, prec, flags | BF_FTOA_JS_QUIRKS);
+  a->sign = saved_sign;
+  if (!str)
+    return JS_ThrowOutOfMemory(ctx);
+  ret = JS_NewString(ctx, str);
+  bf_free(ctx->bf_ctx, str);
+  return ret;
+}
+
+JSValue js_bigdecimal_to_string(JSContext *ctx, JSValueConst val) {
+  return js_bigdecimal_to_string1(ctx, val, 0, BF_RNDZ | BF_FTOA_FORMAT_FREE);
+}
+
+#endif /* CONFIG_BIGNUM */
 
 /* -- ToObject ----------------------------------- */
 

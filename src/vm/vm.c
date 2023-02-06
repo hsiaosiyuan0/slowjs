@@ -263,6 +263,56 @@ static const JSMallocFunctions def_malloc_funcs = {
 #endif
 };
 
+#ifdef CONFIG_BIGNUM
+static JSValue JS_ThrowUnsupportedOperation(JSContext *ctx) {
+  return JS_ThrowTypeError(ctx, "unsupported operation");
+}
+
+static JSValue invalid_to_string(JSContext *ctx, JSValueConst val) {
+  return JS_ThrowUnsupportedOperation(ctx);
+}
+
+static JSValue invalid_from_string(JSContext *ctx, const char *buf, int radix,
+                                   int flags, slimb_t *pexponent) {
+  return JS_NAN;
+}
+
+static int invalid_unary_arith(JSContext *ctx, JSValue *pres, OPCodeEnum op,
+                               JSValue op1) {
+  JS_FreeValue(ctx, op1);
+  JS_ThrowUnsupportedOperation(ctx);
+  return -1;
+}
+
+static int invalid_binary_arith(JSContext *ctx, OPCodeEnum op, JSValue *pres,
+                                JSValue op1, JSValue op2) {
+  JS_FreeValue(ctx, op1);
+  JS_FreeValue(ctx, op2);
+  JS_ThrowUnsupportedOperation(ctx);
+  return -1;
+}
+
+static JSValue invalid_mul_pow10_to_float64(JSContext *ctx, const bf_t *a,
+                                            int64_t exponent) {
+  return JS_ThrowUnsupportedOperation(ctx);
+}
+
+static int invalid_mul_pow10(JSContext *ctx, JSValue *sp) {
+  JS_ThrowUnsupportedOperation(ctx);
+  return -1;
+}
+
+static void set_dummy_numeric_ops(JSNumericOperations *ops) {
+  ops->to_string = invalid_to_string;
+  ops->from_string = invalid_from_string;
+  ops->unary_arith = invalid_unary_arith;
+  ops->binary_arith = invalid_binary_arith;
+  ops->mul_pow10_to_float64 = invalid_mul_pow10_to_float64;
+  ops->mul_pow10 = invalid_mul_pow10;
+}
+
+#endif /* CONFIG_BIGNUM */
+
 JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque) {
   JSRuntime *rt;
   JSMallocState ms;

@@ -7,6 +7,7 @@
 #include "vm/num.h"
 #include "vm/obj.h"
 #include "vm/ops.h"
+#include "vm/vm.h"
 
 /* WARNING: 'p' must be a typed array. Works even if the array buffer
    is detached */

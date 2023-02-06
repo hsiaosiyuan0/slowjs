@@ -301,6 +301,8 @@ int JS_DefineObjectNameComputed(JSContext *ctx, JSValueConst obj,
                                 JSValueConst str, int flags);
 
 JSContext *js_autoinit_get_realm(JSProperty *pr);
+JSAutoInitIDEnum js_autoinit_get_id(JSProperty *pr);
+
 void free_property(JSRuntime *rt, JSProperty *pr, int prop_flags);
 
 force_inline JSShapeProperty *find_own_property1(JSObject *p, JSAtom atom) {

@@ -20,6 +20,13 @@ JSValue JS_Throw(JSContext *ctx, JSValue obj);
 /* return the pending exception (cannot be called twice). */
 JSValue JS_GetException(JSContext *ctx);
 
+#ifdef CONFIG_BIGNUM
+static inline BOOL is_math_mode(JSContext *ctx) {
+  JSStackFrame *sf = ctx->rt->current_stack_frame;
+  return (sf && (sf->js_mode & JS_MODE_MATH));
+}
+#endif
+
 /* -- JSRuntime --------------------------------- */
 
 void JS_SetRuntimeInfo(JSRuntime *rt, const char *s);
