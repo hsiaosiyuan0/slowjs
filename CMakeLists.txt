@@ -10,7 +10,7 @@ include_directories("${PROJECT_SOURCE_DIR}")
 add_subdirectory(src)
 add_subdirectory(libs)
 
-# `qjsc` compiles js into c source file `qjs` is the default command-line
+# `qjsc` compiles js into c source file, `qjs` is the command-line
 # interface shipped by quickjs
 add_subdirectory(qjsc EXCLUDE_FROM_ALL)
 add_subdirectory(qjs EXCLUDE_FROM_ALL)
