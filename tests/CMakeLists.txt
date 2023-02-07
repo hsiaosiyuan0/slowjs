@@ -19,7 +19,7 @@ target_compile_definitions(tests PRIVATE JS_SHARED_LIBRARY=y)
 # get more info from: https://github.com/python/cpython/issues/97524
 target_link_options(tests PRIVATE -shared -undefined dynamic_lookup)
 
-add_dependencies(tests examples)
+add_dependencies(tests qjs examples)
 
 set(QJS "${PROJECT_BINARY_DIR}/qjs/qjs")
 
