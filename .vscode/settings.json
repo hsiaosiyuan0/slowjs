@@ -13,6 +13,7 @@
     "bigdecimal",
     "bigfloat",
     "BIGNUM",
+    "bjson",
     "bugprone",
     "Casefolded",
     "Casemapped",

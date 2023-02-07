@@ -17,4 +17,15 @@ set(QJSC "${PROJECT_BINARY_DIR}/qjsc/qjsc")
 add_custom_command(
   OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/repl.c"
   COMMAND ${QJSC} ARGS -c -o "${CMAKE_CURRENT_SOURCE_DIR}/repl.c" -m
-          "${CMAKE_CURRENT_SOURCE_DIR}/repl.js")
+          "${CMAKE_CURRENT_SOURCE_DIR}/repl.js"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/repl.js")
+
+if(CONFIG_BIGNUM)
+  target_sources(qjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.c")
+
+  add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.c"
+    COMMAND ${QJSC} ARGS -fbignum -c -o "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.c"
+            "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.js"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.js")
+endif()

@@ -5,3 +5,6 @@
 .ninja_log
 /.cache
 /qjs/repl.c
+/qjs/qjscalc.c
+/tests/*.so
+/examples/*.so
