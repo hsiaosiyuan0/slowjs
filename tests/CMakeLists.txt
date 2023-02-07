@@ -1,8 +1,4 @@
-# add_test(qjstests "bjson.c") add_dependencies(qjstests qjs)
-
 add_library(tests SHARED "bjson.c")
-
-enable_testing()
 
 # the lib to be loaded by qjs should have the name without prefix `lib` and with
 # suffix `.so`
@@ -33,6 +29,8 @@ macro(qjs_test)
     COMMAND ${QJS} ${ARGV1} tests/test_${ARGV0}.js
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 endmacro()
+
+enable_testing()
 
 qjs_test(closure)
 qjs_test(language)
