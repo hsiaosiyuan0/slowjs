@@ -68,6 +68,12 @@ JSContext *JS_NewContext(JSRuntime *rt) {
   return ctx;
 }
 
+void *JS_GetContextOpaque(JSContext *ctx) { return ctx->user_opaque; }
+
+void JS_SetContextOpaque(JSContext *ctx, void *opaque) {
+  ctx->user_opaque = opaque;
+}
+
 JSContext *JS_DupContext(JSContext *ctx) {
   ctx->header.ref_count++;
   return ctx;

@@ -75,6 +75,7 @@
     "NFKD",
     "NOKEEP",
     "NOLINTNEXTLINE",
+    "nostrict",
     "npop",
     "npopx",
     "OBJBIN",

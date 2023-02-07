@@ -9,3 +9,5 @@
 /tests/*.so
 /examples/*.so
 /unicode/data
+/tests/run-test262/test262
+/tests/run-test262/test262_report.txt

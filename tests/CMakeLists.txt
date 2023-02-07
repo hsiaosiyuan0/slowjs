@@ -47,3 +47,5 @@ if(CONFIG_BIGNUM)
 else()
   qjs_test(bjson)
 endif()
+
+add_subdirectory(run-test262)
