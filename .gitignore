@@ -8,3 +8,4 @@
 /qjs/qjscalc.c
 /tests/*.so
 /examples/*.so
+/unicode/data

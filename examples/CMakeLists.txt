@@ -9,6 +9,14 @@ set_target_properties(
              OUTPUT_NAME "fib"
              LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(examples_fib PRIVATE JS_SHARED_LIBRARY=y)
+
+# `-undefined dynamic_lookup` will get an annoy warning on OSX greater then 12:
+#
+# ~~~
+# ld: warning: -undefined dynamic_lookup may not work with chained fixups
+# ~~~
+#
+# get more info from: https://github.com/python/cpython/issues/97524
 target_link_options(examples_fib PRIVATE -shared -undefined dynamic_lookup)
 
 add_library(examples_point SHARED "point.c")
