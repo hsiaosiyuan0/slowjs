@@ -48,4 +48,10 @@ else()
   qjs_test(bjson)
 endif()
 
+add_custom_target(
+  microbench
+  COMMAND ${QJS} "${CMAKE_CURRENT_SOURCE_DIR}/microbench.js"
+  DEPENDS qjs
+  JOB_POOL console)
+
 add_subdirectory(run-test262)

@@ -11,3 +11,6 @@ if(CONFIG_BIGNUM)
 else()
   target_compile_options(quickjs PUBLIC -UCONFIG_BIGNUM)
 endif()
+
+target_compile_options(quickjs PUBLIC $<$<CONFIG:Debug>:-O0>
+                                      $<$<CONFIG:Release>:-O2>)
