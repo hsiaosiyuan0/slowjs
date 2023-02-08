@@ -420,8 +420,8 @@ __exception int js_parse_string(JSParseState *s, int sep, BOOL do_throw,
 __exception int js_parse_regexp(JSParseState *s);
 int ident_realloc(JSContext *ctx, char **pbuf, size_t *psize, char *static_buf);
 /* 'c' is the first character. Return JS_ATOM_NULL in case of error */
-static JSAtom parse_ident(JSParseState *s, const uint8_t **pp,
-                          BOOL *pident_has_escape, int c, BOOL is_private);
+JSAtom parse_ident(JSParseState *s, const uint8_t **pp, BOOL *pident_has_escape,
+                   int c, BOOL is_private);
 
 /* -- Assembling opcodes ----------------------------------- */
 

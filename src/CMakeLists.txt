@@ -12,5 +12,19 @@ else()
   target_compile_options(quickjs PUBLIC -UCONFIG_BIGNUM)
 endif()
 
-target_compile_options(quickjs PUBLIC $<$<CONFIG:Debug>:-O0>
-                                      $<$<CONFIG:Release>:-O2>)
+target_compile_options(
+  quickjs
+  PUBLIC -g
+         -Wall
+         -Wextra
+         -Wno-sign-compare
+         -Wno-missing-field-initializers
+         -Wundef
+         -Wuninitialized
+         -Wunused
+         -Wno-unused-parameter
+         -Wwrite-strings
+         -Wchar-subscripts
+         -funsigned-char
+         $<$<CONFIG:Debug>:-O0>
+         $<$<CONFIG:Release>:-O2>)

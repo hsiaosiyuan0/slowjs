@@ -25,23 +25,6 @@ JSModuleDef *js_new_module_def(JSContext *ctx, JSAtom name) {
   return m;
 }
 
-static void js_mark_module_def(JSRuntime *rt, JSModuleDef *m,
-                               JS_MarkFunc *mark_func) {
-  int i;
-
-  for (i = 0; i < m->export_entries_count; i++) {
-    JSExportEntry *me = &m->export_entries[i];
-    if (me->export_type == JS_EXPORT_TYPE_LOCAL && me->u.local.var_ref) {
-      mark_func(rt, &me->u.local.var_ref->header);
-    }
-  }
-
-  JS_MarkValue(rt, m->module_ns, mark_func);
-  JS_MarkValue(rt, m->func_obj, mark_func);
-  JS_MarkValue(rt, m->eval_exception, mark_func);
-  JS_MarkValue(rt, m->meta_obj, mark_func);
-}
-
 void js_free_module_def(JSContext *ctx, JSModuleDef *m) {
   int i;
 

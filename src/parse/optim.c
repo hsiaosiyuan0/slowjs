@@ -388,7 +388,6 @@ static int resolve_scope_var(JSContext *ctx, JSFunctionDef *s, JSAtom var_name,
 
   /* resolve local scoped variables */
   var_idx = -1;
-  int idx2 = s->scopes[scope_level].first;
   for (idx = s->scopes[scope_level].first; idx >= 0;) {
     vd = &s->vars[idx];
     if (vd->var_name == var_name) {

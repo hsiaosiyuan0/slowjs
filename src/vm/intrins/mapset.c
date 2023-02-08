@@ -293,31 +293,6 @@ static void map_decref_record(JSRuntime *rt, JSMapRecord *mr) {
   }
 }
 
-static void reset_weak_ref(JSRuntime *rt, JSObject *p) {
-  JSMapRecord *mr, *mr_next;
-  JSMapState *s;
-
-  /* first pass to remove the records from the WeakMap/WeakSet
-     lists */
-  for (mr = p->first_weak_ref; mr != NULL; mr = mr->next_weak_ref) {
-    s = mr->map;
-    assert(s->is_weak);
-    assert(!mr->empty); /* no iterator on WeakMap/WeakSet */
-    list_del(&mr->hash_link);
-    list_del(&mr->link);
-  }
-
-  /* second pass to free the values to avoid modifying the weak
-     reference list while traversing it. */
-  for (mr = p->first_weak_ref; mr != NULL; mr = mr_next) {
-    mr_next = mr->next_weak_ref;
-    JS_FreeValueRT(rt, mr->value);
-    js_free_rt(rt, mr);
-  }
-
-  p->first_weak_ref = NULL; /* fail safe */
-}
-
 static JSValue js_map_set(JSContext *ctx, JSValueConst this_val, int argc,
                           JSValueConst *argv, int magic) {
   JSMapState *s = JS_GetOpaque2(ctx, this_val, JS_CLASS_MAP + magic);
