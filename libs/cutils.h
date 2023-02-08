@@ -36,7 +36,8 @@
 #define force_inline inline __attribute__((always_inline))
 #define no_inline __attribute__((noinline))
 // `__attribute__((unused)` just suppress the compiler warnings, use
-// `__attribute__((used)) to force LTO to keep the unused definitions
+// `__attribute__((used))` to force LTO to keep the unused definitions but
+// exported for outside usage
 #define __maybe_unused __attribute__((used))
 
 #define xglue(x, y) x##y
