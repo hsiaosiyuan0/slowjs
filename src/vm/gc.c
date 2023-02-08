@@ -610,12 +610,16 @@ void JS_SetGCThreshold(JSRuntime *rt, size_t gc_threshold) {
 
 static void reset_weak_ref(JSRuntime *rt, JSObject *p) {
   JSMapRecord *mr, *mr_next;
+#ifndef NDEBUG
   JSMapState *s;
+#endif
 
   /* first pass to remove the records from the WeakMap/WeakSet
      lists */
   for (mr = p->first_weak_ref; mr != NULL; mr = mr->next_weak_ref) {
+#ifndef NDEBUG
     s = mr->map;
+#endif
     assert(s->is_weak);
     assert(!mr->empty); /* no iterator on WeakMap/WeakSet */
     list_del(&mr->hash_link);

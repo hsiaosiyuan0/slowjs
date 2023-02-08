@@ -35,7 +35,9 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 #define force_inline inline __attribute__((always_inline))
 #define no_inline __attribute__((noinline))
-#define __maybe_unused __attribute__((unused))
+// `__attribute__((unused)` just suppress the compiler warnings, use
+// `__attribute__((used)) to force LTO to keep the unused definitions
+#define __maybe_unused __attribute__((used))
 
 #define xglue(x, y) x##y
 #define glue(x, y) xglue(x, y)

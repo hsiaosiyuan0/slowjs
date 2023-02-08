@@ -165,13 +165,17 @@ void JS_FreeContext(JSContext *ctx) {
 JSRuntime *JS_GetRuntime(JSContext *ctx) { return ctx->rt; }
 
 void JS_SetClassProto(JSContext *ctx, JSClassID class_id, JSValue obj) {
+#ifndef NDEBUG
   JSRuntime *rt = ctx->rt;
+#endif
   assert(class_id < rt->class_count);
   set_value(ctx, &ctx->class_proto[class_id], obj);
 }
 
 JSValue JS_GetClassProto(JSContext *ctx, JSClassID class_id) {
+#ifndef NDEBUG
   JSRuntime *rt = ctx->rt;
+#endif
   assert(class_id < rt->class_count);
   return JS_DupValue(ctx, ctx->class_proto[class_id]);
 }
@@ -1024,7 +1028,9 @@ JSValue JS_EvalObject(JSContext *ctx, JSValueConst this_obj, JSValueConst val,
 
 JSValue JS_EvalThis(JSContext *ctx, JSValueConst this_obj, const char *input,
                     size_t input_len, const char *filename, int eval_flags) {
+#ifndef NDEBUG
   int eval_type = eval_flags & JS_EVAL_TYPE_MASK;
+#endif
   JSValue ret;
 
   assert(eval_type == JS_EVAL_TYPE_GLOBAL || eval_type == JS_EVAL_TYPE_MODULE);

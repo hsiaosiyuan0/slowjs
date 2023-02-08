@@ -56,7 +56,9 @@ JSValue JS_CompactBigInt1(JSContext *ctx, JSValue val,
     JS_FreeValue(ctx, val);
     return JS_NewInt64(ctx, v);
   } else if (a->expn == BF_EXP_ZERO && a->sign) {
+#ifndef NDEBUG
     JSBigFloat *p = JS_VALUE_GET_PTR(val);
+#endif
     assert(p->header.ref_count == 1);
     a->sign = 0;
   }

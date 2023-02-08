@@ -5,26 +5,30 @@ target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(quickjs libs)
 
 option(CONFIG_BIGNUM "Enable bignumber support" ON)
-
 if(CONFIG_BIGNUM)
   target_compile_definitions(quickjs PUBLIC CONFIG_BIGNUM=y)
 else()
   target_compile_options(quickjs PUBLIC -UCONFIG_BIGNUM)
 endif()
 
+option(CONFIG_LTO "Enable Link-Time Optimization" ON)
+if(CONFIG_LTO)
+  target_compile_options(quickjs PUBLIC $<$<CONFIG:Release>:-flto>)
+endif()
+
 target_compile_options(
   quickjs
-  PUBLIC -g
-         -Wall
-         -Wextra
-         -Wno-sign-compare
-         -Wno-missing-field-initializers
-         -Wundef
-         -Wuninitialized
-         -Wunused
-         -Wno-unused-parameter
-         -Wwrite-strings
-         -Wchar-subscripts
-         -funsigned-char
-         $<$<CONFIG:Debug>:-O0>
-         $<$<CONFIG:Release>:-O2>)
+  PRIVATE -g
+          -Wall
+          -Wextra
+          -Wno-sign-compare
+          -Wno-missing-field-initializers
+          -Wundef
+          -Wuninitialized
+          -Wunused
+          -Wno-unused-parameter
+          -Wwrite-strings
+          -Wchar-subscripts
+          -funsigned-char
+          $<$<CONFIG:Debug>:-O0>
+          $<$<CONFIG:Release>:-O2>)

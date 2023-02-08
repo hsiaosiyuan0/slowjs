@@ -672,10 +672,16 @@ static int num_keys_cmp(const void *p1, const void *p2, void *opaque) {
   JSAtom atom1 = ((const JSPropertyEnum *)p1)->atom;
   JSAtom atom2 = ((const JSPropertyEnum *)p2)->atom;
   uint32_t v1, v2;
+#ifndef NDEBUG
   BOOL atom1_is_integer, atom2_is_integer;
 
   atom1_is_integer = JS_AtomIsArrayIndex(ctx, &v1, atom1);
   atom2_is_integer = JS_AtomIsArrayIndex(ctx, &v2, atom2);
+#else
+  JS_AtomIsArrayIndex(ctx, &v1, atom1);
+  JS_AtomIsArrayIndex(ctx, &v2, atom2);
+#endif
+
   assert(atom1_is_integer && atom2_is_integer);
   if (v1 < v2)
     return -1;

@@ -918,8 +918,8 @@ fail:
   return NULL;
 }
 
-uint8_t *JS_WriteObject(JSContext *ctx, size_t *psize, JSValueConst obj,
-                        int flags) {
+__maybe_unused uint8_t *JS_WriteObject(JSContext *ctx, size_t *psize,
+                                       JSValueConst obj, int flags) {
   return JS_WriteObject2(ctx, psize, obj, flags, NULL, NULL);
 }
 
