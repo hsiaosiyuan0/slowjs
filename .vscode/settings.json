@@ -71,6 +71,7 @@
     "longopt",
     "mallocz",
     "MAPSET",
+    "Microbench",
     "MKPTR",
     "nfinity",
     "NFKC",

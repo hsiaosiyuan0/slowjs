@@ -23,7 +23,18 @@ Tests:
 ```bash
 mkdir build
 cd build
-cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release
+# test the release
+# cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake .. --fresh -G Ninja
 ninja tests
 ctest --test-dir tests
+```
+
+Microbench:
+
+```bash
+mkdir build
+cd build
+cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja microbench
 ```
