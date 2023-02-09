@@ -23,6 +23,7 @@ jobs:
 
       - name: Test
         run: |
+					echo $PATH
           mkdir build && cd build 
           cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release 
           ninja tests && ctest --test-dir tests
