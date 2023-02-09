@@ -13,7 +13,12 @@ endif()
 
 option(CONFIG_LTO "Enable Link-Time Optimization" ON)
 if(CONFIG_LTO)
+  # `-flto` should apply on `quickjs` directly, it's not work if `-flto` only
+  # applies on the final executable `qjs`
   target_compile_options(quickjs PUBLIC $<$<CONFIG:Release>:-flto>)
+
+  # force the `LTO` to keep the unused functions for exporting them to c modules
+  target_link_options(quickjs PUBLIC $<$<CONFIG:Release>:-rdynamic>)
 endif()
 
 target_compile_options(
@@ -32,3 +37,5 @@ target_compile_options(
           -funsigned-char
           $<$<CONFIG:Debug>:-O0>
           $<$<CONFIG:Release>:-O2>)
+
+target_link_options(quickjs PUBLIC -lm -ldl -lpthread)

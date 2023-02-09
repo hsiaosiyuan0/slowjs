@@ -1,5 +1,5 @@
-#ifndef QUICKJS_OP_H
-#define QUICKJS_OP_H
+#ifndef QUICKJS_OPS_H
+#define QUICKJS_OPS_H
 
 #include "def.h"
 
