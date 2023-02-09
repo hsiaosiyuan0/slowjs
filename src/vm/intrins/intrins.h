@@ -218,7 +218,7 @@ extern const JSCFunctionListEntry js_boolean_proto_funcs[2];
 
 /* -- String ----------------------------------- */
 
-const JSClassExoticMethods js_string_exotic_methods;
+extern const JSClassExoticMethods js_string_exotic_methods;
 
 JSValue js_string_constructor(JSContext *ctx, JSValueConst new_target, int argc,
                               JSValueConst *argv);
@@ -450,7 +450,7 @@ extern const JSCFunctionListEntry js_async_generator_function_proto_funcs[1];
 
 /* -- AsyncGenerator prototype ----------------------------------- */
 
-const JSCFunctionListEntry js_async_generator_proto_funcs[4];
+extern const JSCFunctionListEntry js_async_generator_proto_funcs[4];
 
 extern JSClassShortDef const js_async_class_def[9];
 

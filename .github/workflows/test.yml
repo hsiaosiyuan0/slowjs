@@ -13,11 +13,11 @@ jobs:
           version: latest
           platform: x64
 
-      - name: Setup Ninja
-        uses: ashutoshvarma/setup-ninja@master
+      - name: Setup Cmake
+        uses: symbitic/install-cmake@master
         with:
-          version: 1.11.1
-          dest: /usr/local/bin
+          cmake: 3.25.1
+          ninja: 1.11.1
 
       - name: Checkout code
         uses: actions/checkout@v2
