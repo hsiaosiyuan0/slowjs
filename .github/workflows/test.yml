@@ -13,6 +13,11 @@ jobs:
           version: latest
           platform: x64
 
+      - name: Setup Ninja
+        uses: ashutoshvarma/setup-ninja@master
+        with:
+          version: 1.11.1
+
       - name: Checkout code
         uses: actions/checkout@v2
 
