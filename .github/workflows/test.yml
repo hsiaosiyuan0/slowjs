@@ -4,33 +4,18 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Cache Clang
-        id: cache-clang
-        uses: actions/cache@v3
-        with:
-          path: clang
-          key: ${{ runner.os }}-clang
-
       - name: Setup Clang
-        if: steps.cache-clang.outputs.cache-hit != 'true'
+        if: matrix.os == 'ubuntu-latest'
         uses: egor-tensin/setup-clang@v1
         with:
           version: latest
           platform: x64
 
-      - name: Cache Cmake
-        id: cache-cmake
-        uses: actions/cache@v3
-        with:
-          path: cmake
-          key: ${{ runner.os }}-cmake
-
       - name: Setup Cmake
         uses: symbitic/install-cmake@master
-        if: steps.cache-cmake.outputs.cache-hit != 'true'
         with:
           cmake: 3.25.1
           ninja: 1.11.1
