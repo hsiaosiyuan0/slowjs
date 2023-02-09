@@ -15,7 +15,7 @@ jobs:
           key: ${{ runner.os }}-clang
 
       - name: Setup Clang
-			  if: steps.cache-clang.outputs.cache-hit != 'true'
+        if: steps.cache-clang.outputs.cache-hit != 'true'
         uses: egor-tensin/setup-clang@v1
         with:
           version: latest
@@ -30,7 +30,7 @@ jobs:
 
       - name: Setup Cmake
         uses: symbitic/install-cmake@master
-			  if: steps.cache-cmake.outputs.cache-hit != 'true'
+        if: steps.cache-cmake.outputs.cache-hit != 'true'
         with:
           cmake: 3.25.1
           ninja: 1.11.1
