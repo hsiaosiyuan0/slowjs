@@ -45,7 +45,7 @@ ninja microbench
 
 ```bash
 cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja ninja run-test262-test2
+ninja run-test262-test2
 
 # Result: 302/75790 errors, 1396 excluded, 7712 skipped, 302 new
 ```
