@@ -1,5 +1,5 @@
-#ifndef QUICKJS_OP_H
-#define QUICKJS_OP_H
+#ifndef QUICKJS_OPS_H
+#define QUICKJS_OPS_H
 
 #include "def.h"
 
@@ -57,7 +57,7 @@ typedef struct {
 } JSOperatorSetData;
 
 #ifdef CONFIG_BIGNUM
-const char js_overloadable_operator_names[JS_OVOP_COUNT][4];
+extern const char js_overloadable_operator_names[JS_OVOP_COUNT][4];
 /* return NULL if not present */
 JSObject *find_binary_op(JSBinaryOperatorDef *def, uint32_t operator_index,
                          JSOverloadableOperatorEnum op);

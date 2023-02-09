@@ -142,9 +142,9 @@ void js_operator_set_mark(JSRuntime *rt, JSValueConst val,
 #endif
 
 #ifdef CONFIG_BIGNUM
-JSClassShortDef const js_std_class_def[47];
+extern JSClassShortDef const js_std_class_def[47];
 #else
-JSClassShortDef const js_std_class_def[40];
+extern JSClassShortDef const js_std_class_def[40];
 #endif
 
 int init_class_range(JSRuntime *rt, JSClassShortDef const *tab, int start,

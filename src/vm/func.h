@@ -160,7 +160,7 @@ extern const uint16_t func_kind_to_class_id[4];
 
 /* -- Arguments ----------------------------------- */
 
-const JSClassExoticMethods js_arguments_exotic_methods;
+extern const JSClassExoticMethods js_arguments_exotic_methods;
 
 int js_arguments_define_own_property(JSContext *ctx, JSValueConst this_obj,
                                      JSAtom prop, JSValueConst val,

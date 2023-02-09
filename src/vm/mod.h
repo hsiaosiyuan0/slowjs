@@ -144,7 +144,7 @@ int js_link_module(JSContext *ctx, JSModuleDef *m);
 void js_free_module_def(JSContext *ctx, JSModuleDef *m);
 void js_free_modules(JSContext *ctx, JSFreeModuleEnum flag);
 
-const JSClassExoticMethods js_module_ns_exotic_methods;
+extern const JSClassExoticMethods js_module_ns_exotic_methods;
 
 int JS_ResolveModule(JSContext *ctx, JSValueConst obj);
 
