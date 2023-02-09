@@ -15,6 +15,7 @@ jobs:
           platform: x64
 
       - name: Setup Cmake
+        if: matrix.os == 'ubuntu-latest'
         uses: symbitic/install-cmake@master
         with:
           cmake: 3.25.1
