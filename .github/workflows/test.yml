@@ -17,6 +17,7 @@ jobs:
         uses: ashutoshvarma/setup-ninja@master
         with:
           version: 1.11.1
+          dest: /usr/local/bin
 
       - name: Checkout code
         uses: actions/checkout@v2
