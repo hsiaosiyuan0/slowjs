@@ -15,19 +15,10 @@ jobs:
           platform: x64
 
       - name: Setup Cmake
-        if: matrix.os == 'ubuntu-latest'
-        uses: symbitic/install-cmake@master
+        uses: aminya/install-cmake@master
         with:
           cmake: 3.25.1
           ninja: 1.11.1
-
-      - name: Setup Cmake
-        uses: symbitic/install-cmake@master
-        if: matrix.os == 'macos-latest'
-        with:
-          cmake: 3.25.1
-          ninja: 1.11.1
-          platform: mac
 
       - name: Checkout code
         uses: actions/checkout@v2
