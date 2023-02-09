@@ -22,11 +22,11 @@ jobs:
 
       - name: Setup Cmake
         uses: symbitic/install-cmake@master
-				if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest'
         with:
           cmake: 3.25.1
           ninja: 1.11.1
-					platform: mac
+          platform: mac
 
       - name: Checkout code
         uses: actions/checkout@v2
