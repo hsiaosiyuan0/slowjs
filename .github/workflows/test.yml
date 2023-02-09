@@ -21,11 +21,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Setup node@16
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16
-
       - name: Test
         run: |
           mkdir build && cd build 
