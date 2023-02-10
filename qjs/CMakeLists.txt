@@ -20,7 +20,7 @@ add_custom_command(
           "${CMAKE_CURRENT_SOURCE_DIR}/repl.js"
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/repl.js")
 
-if(CONFIG_BIGNUM)
+if(QJS_CONFIG_BIGNUM)
   target_sources(qjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.c")
 
   add_custom_command(

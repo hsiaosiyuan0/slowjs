@@ -39,7 +39,7 @@ qjs_test(loop)
 qjs_test(std)
 qjs_test(worker)
 
-if(CONFIG_BIGNUM)
+if(QJS_CONFIG_BIGNUM)
   qjs_test(bjson "--bignum")
   qjs_test(op_overloading "--bignum")
   qjs_test(bignum "--bignum")
