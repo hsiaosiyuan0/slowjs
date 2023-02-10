@@ -29,3 +29,5 @@ if(QJS_CONFIG_BIGNUM)
             "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.js"
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.js")
 endif()
+
+find_package(Boost REQUIRED)

@@ -11,3 +11,5 @@
 /unicode/data
 /tests/run-test262/test262
 /tests/run-test262/test262_report.txt
+/vcpkg_installed
+vcpkg-manifest-install.log

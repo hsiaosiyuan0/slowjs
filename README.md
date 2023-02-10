@@ -1,14 +1,22 @@
 ## Development
 
-### Building
-
-First, in project root directory create a directory to handle the building stuffs:
+First of all, you need to create a directory in project root directory to handle the building stuffs:
 
 ```bash
 mkdir build
 ```
 
-then keep in project root directory and choose one of below sections to run.
+### Setup vcpkg
+
+First, install vcpkg by following its [official tutorial](https://vcpkg.io/en/getting-started.html)
+
+then run below command to integrate vcpkg with cmake:
+
+```bash
+cmake -B build -S . -G Ninja -D CMAKE_TOOLCHAIN_FILE=$(dirname `which vcpkg`)/scripts/buildsystems/vcpkg.cmake
+```
+
+### Building
 
 Before you perform the actual build it's better to glance over the available options:
 
@@ -28,6 +36,8 @@ cmake -B build -S . -G Ninja -D QJS_DUMP_BYTECODE=1
 
 > - `-S` stands for the source directory
 > - `-D` stands for defining the options in a `key=value` pattern
+
+then choose one of below sections to run in project root directory
 
 #### Debug build
 
