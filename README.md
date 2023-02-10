@@ -8,7 +8,19 @@ First, in project root directory create a directory to handle the building stuff
 mkdir build
 ```
 
-then choose one of below command groups to run in the `build` directory
+then in the `build` directory, choose one of the command groups listed in below sections to run.
+
+Before you perform the actual build it's better to glance over the available options:
+
+```bash
+cd build && cmake -LH ..
+```
+
+above command will print the available options and their help message, use them like this:
+
+```bash
+cmake .. --fresh -G Ninja -DQJS_DUMP_BYTECODE=1
+```
 
 #### Debug build
 
@@ -27,8 +39,6 @@ ninja tests
 #### Tests
 
 ```bash
-# test the release
-# cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake .. --fresh -G Ninja
 ninja tests
 ctest --test-dir tests

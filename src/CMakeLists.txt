@@ -4,21 +4,34 @@ target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(quickjs libs)
 
-option(CONFIG_BIGNUM "Enable bignumber support" ON)
-if(CONFIG_BIGNUM)
+option(QJS_CONFIG_BIGNUM "Enable bignumber support" ON)
+if(QJS_CONFIG_BIGNUM)
   target_compile_definitions(quickjs PUBLIC CONFIG_BIGNUM=y)
 else()
   target_compile_options(quickjs PUBLIC -UCONFIG_BIGNUM)
 endif()
 
-option(CONFIG_LTO "Enable Link-Time Optimization" ON)
-if(CONFIG_LTO)
+option(QJS_CONFIG_LTO "Enable Link-Time Optimization in release build" ON)
+if(QJS_CONFIG_LTO)
   # `-flto` should apply on `quickjs` directly, it's not work if `-flto` only
   # applies on the final executable `qjs`
   target_compile_options(quickjs PUBLIC $<$<CONFIG:Release>:-flto>)
 
   # force the `LTO` to keep the unused functions for exporting them to c modules
   target_link_options(quickjs PUBLIC $<$<CONFIG:Release>:-rdynamic>)
+endif()
+
+set(QJS_DUMP_BYTECODE_HELP
+    "Dump the bytecode of the compiled functions: combination of bits
+// 1: dump pass 3 final byte code
+// 2: dump pass 2 code
+// 4: dump pass 1 code
+// 8: dump stdlib functions
+// 16: dump bytecode in hex
+// 32: dump line number table")
+option(QJS_DUMP_BYTECODE ${QJS_DUMP_BYTECODE_HELP} OFF)
+if(QJS_DUMP_BYTECODE)
+  target_compile_definitions(quickjs PUBLIC DUMP_BYTECODE=${QJS_DUMP_BYTECODE})
 endif()
 
 target_compile_options(
