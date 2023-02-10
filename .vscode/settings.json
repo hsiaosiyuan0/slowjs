@@ -15,6 +15,7 @@
     "BIGNUM",
     "bjson",
     "bugprone",
+    "BYTECODE",
     "Casefolded",
     "Casemapped",
     "catchable",
