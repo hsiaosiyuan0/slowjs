@@ -52,3 +52,8 @@ target_compile_options(
           $<$<CONFIG:Release>:-O2>)
 
 target_link_options(quickjs PUBLIC -lm -ldl -lpthread)
+
+if(LINUX)
+  # use `lld` to work with clang on Linux
+  target_link_options(quickjs PUBLIC -fuse-ld=lld)
+endif()

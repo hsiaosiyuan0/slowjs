@@ -1,0 +1,31 @@
+on: [push, pull_request]
+name: Test
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup Clang
+        if: matrix.os == 'ubuntu-latest'
+        uses: egor-tensin/setup-clang@v1
+        with:
+          version: latest
+          platform: x64
+
+      - name: Setup Cmake
+        uses: aminya/install-cmake@master
+        with:
+          cmake: 3.25.1
+          ninja: 1.11.1
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Test
+        run: |
+          mkdir build && cd build 
+          cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release 
+          ninja tests && ctest --test-dir tests --output-on-failure
+        shell: bash
