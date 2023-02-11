@@ -22,6 +22,8 @@ jobs:
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v10
+        with:
+          vcpkgGitCommitId: 37fce29a263a1546262eaed6af7ccac53b0094cd
 
       - name: Run Tests in Debug mode
         uses: lukka/run-cmake@v10
