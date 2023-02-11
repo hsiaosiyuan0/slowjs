@@ -31,4 +31,4 @@ jobs:
         with:
           configurePreset: "ci"
           buildPreset: "run-tests"
-          buildPresetAdditionalArgs: ["--config Release"]
+          buildPresetAdditionalArgs: '["--config Release"]'
