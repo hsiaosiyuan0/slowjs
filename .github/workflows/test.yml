@@ -30,6 +30,7 @@ jobs:
         with:
           configurePreset: "ci"
           buildPreset: "ci"
+          testPreset: "ci"
 
       - name: Run Tests in Release mode
         uses: lukka/run-cmake@v10
@@ -37,3 +38,4 @@ jobs:
           configurePreset: "ci"
           buildPreset: "ci"
           buildPresetAdditionalArgs: '["--config Release"]'
+          testPreset: "ci"
