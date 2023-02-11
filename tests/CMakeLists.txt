@@ -25,10 +25,9 @@ add_dependencies(tests qjs examples)
 set(QJS "$<TARGET_FILE:qjs>")
 
 macro(qjs_test)
-  add_test(
-    NAME test_${ARGV0}
-    COMMAND ${QJS} ${ARGV1} tests/test_${ARGV0}.js
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+  add_test(NAME test_${ARGV0}
+           COMMAND ${QJS} ${ARGV1}
+                   "${PROJECT_SOURCE_DIR}/tests/test_${ARGV0}.js")
 endmacro()
 
 enable_testing()
