@@ -33,6 +33,14 @@
 			"cacheVariables": {
 				"CMAKE_TOOLCHAIN_FILE": "./vcpkg/scripts/buildsystems/vcpkg.cmake"
 			}
+		},
+		{
+			"name": "ci:boost",
+			"description": "Github action support",
+			"inherits": "ci",
+			"cacheVariables": {
+				"QJS_CONFIG_DEBUGGER": "y"
+			}
 		}
 	],
 	"buildPresets": [
@@ -68,6 +76,13 @@
 		{
 			"name": "ci",
 			"configurePreset": "ci",
+			"targets": [
+				"run-tests"
+			]
+		},
+		{
+			"name": "ci:boost",
+			"configurePreset": "ci:boost",
 			"targets": [
 				"run-tests"
 			]
