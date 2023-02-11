@@ -51,7 +51,7 @@ endif()
 
 add_custom_target(
   run-tests
-  COMMAND ctest -C $<CONFIG>
+  COMMAND ctest -C $<CONFIG> --output-on-failure
   DEPENDS tests
   JOB_POOL console)
 
