@@ -19,14 +19,6 @@
 			"vendor": {}
 		},
 		{
-			"name": "ci",
-			"description": "Github action supports",
-			"inherits": "default",
-			"cacheVariables": {
-				"CMAKE_TOOLCHAIN_FILE": "./vcpkg/scripts/buildsystems/vcpkg.cmake"
-			}
-		},
-		{
 			"name": "qjs-debugger",
 			"description": "Compile qjs with debugger support",
 			"inherits": "default",
@@ -66,8 +58,8 @@
 			]
 		},
 		{
-			"name": "ci",
-			"configurePreset": "ci",
+			"name": "default",
+			"configurePreset": "default",
 			"targets": [
 				"run-tests"
 			]

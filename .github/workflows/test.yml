@@ -19,16 +19,19 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v2
+			
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v10
 
       - name: Run Tests in Debug mode
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "ci"
+          configurePreset: "default"
           buildPreset: "run-tests"
 
       - name: Run Tests in Release mode
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "ci"
+          configurePreset: "default"
           buildPreset: "run-tests"
           buildPresetAdditionalArgs: '["--config Release"]'
