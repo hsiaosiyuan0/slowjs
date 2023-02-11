@@ -16,10 +16,10 @@ if(QJS_CONFIG_LTO)
   # `-flto` should apply on `quickjs` directly, it's not work if `-flto` only
   # applies on the final executable `qjs`
   target_compile_options(quickjs PUBLIC $<$<CONFIG:Release>:-flto>)
-
-  # force the `LTO` to keep the unused functions for exporting them to c modules
-  target_link_options(quickjs PUBLIC $<$<CONFIG:Release>:-rdynamic>)
 endif()
+
+# force the `LTO` to keep the unused functions for exporting them to c modules
+target_link_options(quickjs PUBLIC -rdynamic)
 
 option(QJS_CONFIG_DEBUGGER "Enable debugger support" OFF)
 if(QJS_CONFIG_DEBUGGER)

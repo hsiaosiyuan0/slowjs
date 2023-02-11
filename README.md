@@ -57,8 +57,7 @@ cmake --build build
 
 ```bash
 cmake -B build -S . -G Ninja
-cmake --build build --target tests
-ctest --test-dir build/tests
+cmake --build build --target run-tests
 ```
 
 #### Microbench

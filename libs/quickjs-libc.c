@@ -478,8 +478,9 @@ static JSModuleDef *js_module_loader_so(JSContext *ctx,
     js_free(ctx, filename);
   if (!hd) {
     JS_ThrowReferenceError(
-        ctx, "could not load module filename '%s' as shared library",
-        module_name);
+        ctx,
+        "could not load module filename '%s' as shared library, reason: %s",
+        module_name, dlerror());
     goto fail;
   }
 
