@@ -87,7 +87,7 @@
 		},
 		{
 			"name": "ci:tests",
-			"configurePreset": "ci",
+			"configurePreset": "ci:tests",
 			"targets": [
 				"run-tests"
 			]
