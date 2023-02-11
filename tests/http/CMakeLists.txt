@@ -1,5 +1,5 @@
-add_executable(testhttp http.cpp)
-set_property(TARGET testhttp PROPERTY CXX_STANDARD 20)
+add_executable(test-http http.cpp)
+set_property(TARGET test-http PROPERTY CXX_STANDARD 20)
 
 find_package(Boost REQUIRED)
-target_link_libraries(testhttp PRIVATE Boost::boost)
+target_link_libraries(test-http PRIVATE Boost::boost)

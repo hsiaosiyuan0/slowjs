@@ -74,6 +74,13 @@
 			]
 		},
 		{
+			"name": "test-http",
+			"configurePreset": "default",
+			"targets": [
+				"test-http"
+			]
+		},
+		{
 			"name": "ci",
 			"configurePreset": "ci",
 			"targets": [
