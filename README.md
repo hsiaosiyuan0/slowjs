@@ -75,3 +75,15 @@ cmake --build build --target run-test262-test2
 
 # Result: 302/75790 errors, 1396 excluded, 7712 skipped, 302 new
 ```
+
+### Presets
+
+You can also choose the presets listed in `CMakePresets.json` to run:
+
+```bash
+# Tell cmake to config used by building tools
+cmake -S . --preset=default 
+
+# Use a build preset
+cmake --build --preset=run-tests 
+```

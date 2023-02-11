@@ -36,4 +36,23 @@ jobs:
         with:
           configurePreset: "ci"
           buildPreset: "ci"
-          buildPresetAdditionalArgs: '["--config Release"]'
+
+      - name: Run Tests in Debug mode
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "ci"
+          configurePresetAdditionalArgs: '[-DCMAKE_BUILD_TYPE=Release]'
+          buildPreset: "ci"
+
+      - name: Run test build boost in debug mode
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "ci:boost"
+          buildPreset: "ci:boost"
+
+      - name: Run test build boost in release mode
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "ci:boost"
+          configurePresetAdditionalArgs: '[-DCMAKE_BUILD_TYPE=Release]'
+          buildPreset: "ci:boost"
