@@ -21,12 +21,6 @@ target_link_options(tests PRIVATE -shared -undefined dynamic_lookup)
 
 add_dependencies(tests qjs examples)
 
-add_custom_target(
-  run-tests
-  COMMAND ctest
-  DEPENDS tests
-  JOB_POOL console)
-
 set(QJS "$<TARGET_FILE:qjs>")
 
 macro(qjs_test)
@@ -53,6 +47,12 @@ if(QJS_CONFIG_BIGNUM)
 else()
   qjs_test(bjson)
 endif()
+
+add_custom_target(
+  run-tests
+  COMMAND ctest -C $<CONFIG>
+  DEPENDS tests
+  JOB_POOL console)
 
 add_custom_target(
   microbench
