@@ -169,7 +169,7 @@ static void
       /* only handle %p and %zd */
       if (*fmt == 'p') {
         uint8_t *ptr = (uint8_t *)va_arg(ap, void *);
-        if (ptr == nullptr) {
+        if (ptr == NULL) {
           printf("NULL");
         } else {
           printf("H%+06lld.%zd",
@@ -203,7 +203,7 @@ static void *js_trace_malloc(JSMallocState *s, size_t size) {
   assert(size != 0);
 
   if (unlikely(s->malloc_size + size > s->malloc_limit))
-    return nullptr;
+    return NULL;
   ptr = malloc(size);
   js_trace_malloc_printf(s, "A %zd -> %p\n", size, ptr);
   if (ptr) {

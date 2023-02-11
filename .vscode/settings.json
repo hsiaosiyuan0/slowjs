@@ -16,6 +16,7 @@
     "BIGNUM",
     "bjson",
     "bugprone",
+    "buildsystems",
     "BYTECODE",
     "Casefolded",
     "Casemapped",

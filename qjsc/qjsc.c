@@ -181,9 +181,16 @@ static void output_object_code(JSContext *ctx, FILE *fo, JSValueConst obj,
 
   namelist_add(&cname_list, c_name, NULL, load_only);
 
-  fprintf(fo, "extern const uint32_t %s_size = %u;\n\n", c_name,
+  fprintf(fo, "\n#ifdef __cplusplus\n /* extern \"C\" { */\n"
+              "  #define EXTERN_CONST extern const\n"
+              "#else\n"
+              "  #define EXTERN_CONST const\n"
+              "#endif\n\n");
+
+  fprintf(fo, "EXTERN_CONST uint32_t %s_size = %u;\n\n", c_name,
           (unsigned int)out_buf_len);
-  fprintf(fo, "extern const uint8_t %s[%u] = {\n", c_name, (unsigned int)out_buf_len);
+  fprintf(fo, "EXTERN_CONST uint8_t %s[%u] = {\n", c_name,
+          (unsigned int)out_buf_len);
   dump_hex(fo, out_buf, out_buf_len);
   fprintf(fo, "};\n\n");
 

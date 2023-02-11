@@ -21,7 +21,13 @@ target_link_options(tests PRIVATE -shared -undefined dynamic_lookup)
 
 add_dependencies(tests qjs examples)
 
-set(QJS "${PROJECT_BINARY_DIR}/qjs/qjs")
+add_custom_target(
+  run-tests
+  COMMAND ctest
+  DEPENDS tests
+  JOB_POOL console)
+
+set(QJS "$<TARGET_FILE:qjs>")
 
 macro(qjs_test)
   add_test(

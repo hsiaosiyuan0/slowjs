@@ -15,17 +15,13 @@ jobs:
           platform: x64
 
       - name: Setup Cmake
-        uses: aminya/install-cmake@master
-        with:
-          cmake: 3.25.1
-          ninja: 1.11.1
+        uses: lukka/get-cmake@latest
 
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Test
-        run: |
-          mkdir build && cd build 
-          cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release 
-          ninja tests && ctest --test-dir tests --output-on-failure
-        shell: bash
+      - name: Run Tests
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "default"
+          buildPreset: "run-tests"
