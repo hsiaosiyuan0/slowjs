@@ -25,6 +25,14 @@
 			"cacheVariables": {
 				"QJS_CONFIG_DEBUGGER": "y"
 			}
+		},
+		{
+			"name": "ci",
+			"description": "Github action support",
+			"inherits": "default",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "./vcpkg/scripts/buildsystems/vcpkg.cmake"
+			}
 		}
 	],
 	"buildPresets": [
@@ -58,8 +66,8 @@
 			]
 		},
 		{
-			"name": "default",
-			"configurePreset": "default",
+			"name": "ci",
+			"configurePreset": "ci",
 			"targets": [
 				"run-tests"
 			]

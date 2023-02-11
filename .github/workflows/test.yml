@@ -28,12 +28,12 @@ jobs:
       - name: Run Tests in Debug mode
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "default"
-          buildPreset: "run-tests"
+          configurePreset: "ci"
+          buildPreset: "ci"
 
       - name: Run Tests in Release mode
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "default"
-          buildPreset: "run-tests"
+          configurePreset: "ci"
+          buildPreset: "ci"
           buildPresetAdditionalArgs: '["--config Release"]'
