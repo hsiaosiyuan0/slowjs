@@ -7,7 +7,8 @@ set_target_properties(
   PROPERTIES PREFIX ""
              SUFFIX ".so"
              OUTPUT_NAME "fib"
-             LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+             LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}"
+             LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(examples_fib PRIVATE JS_SHARED_LIBRARY=y)
 
 # `-undefined dynamic_lookup` will get an annoy warning on OSX greater then 12:
@@ -25,7 +26,8 @@ set_target_properties(
   PROPERTIES PREFIX ""
              SUFFIX ".so"
              OUTPUT_NAME "point"
-             LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+             LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}"
+             LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(examples_point PRIVATE JS_SHARED_LIBRARY=y)
 target_link_options(examples_point PRIVATE -shared -undefined dynamic_lookup)
 
