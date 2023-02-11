@@ -35,6 +35,11 @@
 			}
 		},
 		{
+			"name": "ci:tests",
+			"description": "Github action support",
+			"inherits": "ci"
+		},
+		{
 			"name": "ci:boost",
 			"description": "Github action support",
 			"inherits": "ci",
