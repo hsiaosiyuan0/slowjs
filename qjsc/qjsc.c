@@ -181,9 +181,9 @@ static void output_object_code(JSContext *ctx, FILE *fo, JSValueConst obj,
 
   namelist_add(&cname_list, c_name, NULL, load_only);
 
-  fprintf(fo, "const uint32_t %s_size = %u;\n\n", c_name,
+  fprintf(fo, "extern const uint32_t %s_size = %u;\n\n", c_name,
           (unsigned int)out_buf_len);
-  fprintf(fo, "const uint8_t %s[%u] = {\n", c_name, (unsigned int)out_buf_len);
+  fprintf(fo, "extern const uint8_t %s[%u] = {\n", c_name, (unsigned int)out_buf_len);
   dump_hex(fo, out_buf, out_buf_len);
   fprintf(fo, "};\n\n");
 
@@ -631,6 +631,9 @@ int main(int argc, char **argv) {
                 "\n");
   }
 
+  fprintf(fo, "\n#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
+              "\n");
+
   for (i = optind; i < argc; i++) {
     const char *filename = argv[i];
     compile_file(ctx, fo, filename, cname, module);
@@ -714,6 +717,8 @@ int main(int argc, char **argv) {
     }
     fputs(main_c_template2, fo);
   }
+
+  fprintf(fo, "\n#ifdef __cplusplus\n} /* extern \"C\" { */\n#endif\n");
 
   JS_FreeContext(ctx);
   JS_FreeRuntime(rt);

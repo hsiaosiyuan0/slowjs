@@ -21,6 +21,11 @@ if(QJS_CONFIG_LTO)
   target_link_options(quickjs PUBLIC $<$<CONFIG:Release>:-rdynamic>)
 endif()
 
+option(QJS_CONFIG_DEBUGGER "Enable debugger support" OFF)
+if(QJS_CONFIG_DEBUGGER)
+  target_compile_definitions(quickjs PUBLIC CONFIG_DEBUGGER=y)
+endif()
+
 set(QJS_DUMP_BYTECODE_HELP
     "Dump the bytecode of the compiled functions: combination of bits
 // 1: dump pass 3 final byte code
