@@ -72,11 +72,5 @@
 				"run-tests"
 			]
 		}
-	],
-	"testPresets": [
-		{
-			"name": "default",
-			"configurePreset": "default"
-		}
 	]
 }
