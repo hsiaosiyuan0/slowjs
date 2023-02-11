@@ -19,7 +19,15 @@
 			"vendor": {}
 		},
 		{
-			"name": "qjs:debugger",
+			"name": "ci",
+			"description": "Github action supports",
+			"inherits": "default",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "./vcpkg/scripts/buildsystems/vcpkg.cmake"
+			}
+		},
+		{
+			"name": "qjs-debugger",
 			"description": "Compile qjs with debugger support",
 			"inherits": "default",
 			"cacheVariables": {
@@ -29,9 +37,9 @@
 	],
 	"buildPresets": [
 		{
-			"name": "qjs:debugger",
+			"name": "qjs-debugger",
 			"description": "Run qjs with debugger support",
-			"configurePreset": "qjs:debugger",
+			"configurePreset": "qjs-debugger",
 			"targets": [
 				"qjs"
 			]
@@ -48,16 +56,21 @@
 			"configurePreset": "default",
 			"targets": [
 				"microbench"
-			],
-			"configuration": "Release"
+			]
 		},
 		{
 			"name": "run-test262",
 			"configurePreset": "default",
 			"targets": [
 				"run-test262-test2"
-			],
-			"configuration": "Release"
+			]
+		},
+		{
+			"name": "ci",
+			"configurePreset": "ci",
+			"targets": [
+				"run-tests"
+			]
 		}
 	]
 }
