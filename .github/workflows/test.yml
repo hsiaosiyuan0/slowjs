@@ -15,17 +15,38 @@ jobs:
           platform: x64
 
       - name: Setup Cmake
-        uses: aminya/install-cmake@master
-        with:
-          cmake: 3.25.1
-          ninja: 1.11.1
+        uses: lukka/get-cmake@latest
 
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Test
-        run: |
-          mkdir build && cd build 
-          cmake .. --fresh -G Ninja -DCMAKE_BUILD_TYPE=Release 
-          ninja tests && ctest --test-dir tests --output-on-failure
-        shell: bash
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v10
+        with:
+          vcpkgGitCommitId: 37fce29a263a1546262eaed6af7ccac53b0094cd
+
+      - name: Run Tests in Debug mode
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "ci:tests"
+          buildPreset: "ci:tests"
+
+      - name: Run Tests in Release mode
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "ci:tests"
+          configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
+          buildPreset: "ci:tests"
+
+      - name: Run test build boost in debug mode
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "ci:boost"
+          buildPreset: "ci:boost"
+
+      - name: Run test build boost in release mode
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "ci:boost"
+          configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
+          buildPreset: "ci:boost"

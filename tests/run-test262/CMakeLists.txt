@@ -11,7 +11,7 @@ target_compile_definitions(run-test262
 
 add_dependencies(run-test262 quickjs)
 
-set(RUN_TEST262 "${PROJECT_BINARY_DIR}/tests/run-test262/run-test262")
+set(RUN_TEST262 "$<TARGET_FILE:run-test262>")
 
 add_custom_target(
   run-test262-test2-default

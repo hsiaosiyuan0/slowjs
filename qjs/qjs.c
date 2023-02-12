@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,7 +50,7 @@ extern const uint32_t qjsc_qjscalc_size;
 static int bignum_ext;
 #endif
 
-static int eval_buf(JSContext *ctx, const void *buf, int buf_len,
+static int eval_buf(JSContext *ctx, const char *buf, int buf_len,
                     const char *filename, int eval_flags) {
   JSValue val;
   int ret;
@@ -95,7 +96,7 @@ static int eval_file(JSContext *ctx, const char *filename, int module) {
     eval_flags = JS_EVAL_TYPE_MODULE;
   else
     eval_flags = JS_EVAL_TYPE_GLOBAL;
-  ret = eval_buf(ctx, buf, buf_len, filename, eval_flags);
+  ret = eval_buf(ctx, (const char *)buf, buf_len, filename, eval_flags);
   js_free(ctx, buf);
   return ret;
 }
@@ -167,11 +168,13 @@ static void
     if (c == '%') {
       /* only handle %p and %zd */
       if (*fmt == 'p') {
-        uint8_t *ptr = va_arg(ap, void *);
+        uint8_t *ptr = (uint8_t *)va_arg(ap, void *);
         if (ptr == NULL) {
           printf("NULL");
         } else {
-          printf("H%+06lld.%zd", js_trace_malloc_ptr_offset(ptr, s->opaque),
+          printf("H%+06lld.%zd",
+                 js_trace_malloc_ptr_offset(
+                     ptr, (struct trace_malloc_data *)s->opaque),
                  js_trace_malloc_usable_size(ptr));
         }
         fmt++;
@@ -190,7 +193,7 @@ static void
 }
 
 static void js_trace_malloc_init(struct trace_malloc_data *s) {
-  free(s->base = malloc(8));
+  free(s->base = (uint8_t *)malloc(8));
 }
 
 static void *js_trace_malloc(JSMallocState *s, size_t size) {
@@ -298,6 +301,9 @@ void help(void) {
   exit(1);
 }
 
+// #ifdef __cplusplus
+// extern "C" int main(int argc, char **argv);
+// #endif
 int main(int argc, char **argv) {
   JSRuntime *rt;
   JSContext *ctx;

@@ -1,6 +1,9 @@
 #include "parse.h"
 
 #include "utils/dbuf.h"
+#if defined(DUMP_BYTECODE)
+#include "vm/dump.h"
+#endif
 #include "vm/error.h"
 
 /* -- Parse Function ----------------------------------- */

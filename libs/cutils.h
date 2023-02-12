@@ -28,6 +28,10 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* set if CPU is big endian */
 #undef WORDS_BIGENDIAN
 
@@ -242,5 +246,9 @@ static inline int from_hex(int c) {
 
 void rqsort(void *base, size_t nmemb, size_t size,
             int (*cmp)(const void *, const void *, void *), void *arg);
+
+#ifdef __cplusplus
+} /* extern "C" { */
+#endif
 
 #endif /* CUTILS_H */

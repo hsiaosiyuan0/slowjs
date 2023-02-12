@@ -1,0 +1,103 @@
+{
+	"version": 6,
+	"cmakeMinimumRequired": {
+		"major": 3,
+		"minor": 24,
+		"patch": 0
+	},
+	"configurePresets": [
+		{
+			"name": "default",
+			"displayName": "Default Config",
+			"description": "Default build using Ninja generator",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build/",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_INSTALLED_DIR}/scripts/buildsystems/vcpkg.cmake"
+			},
+			"environment": {},
+			"vendor": {}
+		},
+		{
+			"name": "qjs-debugger",
+			"description": "Compile qjs with debugger support",
+			"inherits": "default",
+			"cacheVariables": {
+				"QJS_CONFIG_DEBUGGER": "y"
+			}
+		},
+		{
+			"name": "ci",
+			"description": "Github action support",
+			"inherits": "default",
+			"cacheVariables": {
+				"CMAKE_TOOLCHAIN_FILE": "./vcpkg/scripts/buildsystems/vcpkg.cmake"
+			}
+		},
+		{
+			"name": "ci:tests",
+			"description": "Github action support",
+			"inherits": "ci"
+		},
+		{
+			"name": "ci:boost",
+			"description": "Github action support",
+			"inherits": "ci",
+			"cacheVariables": {
+				"QJS_CONFIG_DEBUGGER": "y"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "qjs-debugger",
+			"description": "Run qjs with debugger support",
+			"configurePreset": "qjs-debugger",
+			"targets": [
+				"qjs"
+			]
+		},
+		{
+			"name": "run-tests",
+			"configurePreset": "default",
+			"targets": [
+				"run-tests"
+			]
+		},
+		{
+			"name": "run-microbench",
+			"configurePreset": "default",
+			"targets": [
+				"microbench"
+			]
+		},
+		{
+			"name": "run-test262",
+			"configurePreset": "default",
+			"targets": [
+				"run-test262-test2"
+			]
+		},
+		{
+			"name": "test-http",
+			"configurePreset": "default",
+			"targets": [
+				"test-http"
+			]
+		},
+		{
+			"name": "ci:tests",
+			"configurePreset": "ci:tests",
+			"targets": [
+				"run-tests"
+			]
+		},
+		{
+			"name": "ci:boost",
+			"configurePreset": "ci:boost",
+			"targets": [
+				"run-tests"
+			]
+		}
+	]
+}

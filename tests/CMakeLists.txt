@@ -21,13 +21,12 @@ target_link_options(tests PRIVATE -shared -undefined dynamic_lookup)
 
 add_dependencies(tests qjs examples)
 
-set(QJS "${PROJECT_BINARY_DIR}/qjs/qjs")
+set(QJS "$<TARGET_FILE:qjs>")
 
 macro(qjs_test)
-  add_test(
-    NAME test_${ARGV0}
-    COMMAND ${QJS} ${ARGV1} tests/test_${ARGV0}.js
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+  add_test(NAME test_${ARGV0}
+           COMMAND ${QJS} ${ARGV1}
+                   "${PROJECT_SOURCE_DIR}/tests/test_${ARGV0}.js")
 endmacro()
 
 enable_testing()
@@ -39,7 +38,7 @@ qjs_test(loop)
 qjs_test(std)
 qjs_test(worker)
 
-if(CONFIG_BIGNUM)
+if(QJS_CONFIG_BIGNUM)
   qjs_test(bjson "--bignum")
   qjs_test(op_overloading "--bignum")
   qjs_test(bignum "--bignum")
@@ -49,9 +48,16 @@ else()
 endif()
 
 add_custom_target(
+  run-tests
+  COMMAND ctest -C $<CONFIG> --output-on-failure
+  DEPENDS tests
+  JOB_POOL console)
+
+add_custom_target(
   microbench
   COMMAND ${QJS} "${CMAKE_CURRENT_SOURCE_DIR}/microbench.js"
   DEPENDS qjs
   JOB_POOL console)
 
 add_subdirectory(run-test262)
+add_subdirectory(http EXCLUDE_FROM_ALL)
