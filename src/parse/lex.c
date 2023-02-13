@@ -1,3 +1,4 @@
+#include "libs/cutils.h"
 #include "parse.h"
 
 #include "vm/conv.h"
@@ -28,7 +29,7 @@ void skip_shebang(JSParseState *s) {
 }
 
 __exception int next_token(JSParseState *s) {
-  const uint8_t *p;
+  const uint8_t *p, *tp;
   int c;
   BOOL ident_has_escape;
   JSAtom atom;
@@ -44,6 +45,7 @@ __exception int next_token(JSParseState *s) {
   s->last_line_num = s->token.line_num;
 redo:
   s->token.line_num = s->line_num;
+  s->token.col_num = s->col_num;
   s->token.ptr = p;
   c = *p;
   switch (c) {
@@ -74,12 +76,14 @@ redo:
   line_terminator:
     s->got_lf = TRUE;
     s->line_num++;
+    s->col_num = 1;
     goto redo;
   case '\f':
   case '\v':
   case ' ':
   case '\t':
     p++;
+    s->col_num += 1;
     goto redo;
   case '/':
     if (p[1] == '*') {
@@ -96,6 +100,7 @@ redo:
         }
         if (*p == '\n') {
           s->line_num++;
+          s->col_num = 1;
           s->got_lf = TRUE; /* considered as LF for ASI */
           p++;
         } else if (*p == '\r') {
@@ -112,6 +117,15 @@ redo:
           p++;
         }
       }
+
+#ifdef CONFIG_DEBUGGER
+      tp = s->token.ptr;
+      while (tp < p) {
+        unicode_from_utf8(tp, UTF8_CHAR_LEN_MAX, &tp);
+        s->col_num += 1;
+      }
+#endif
+
       goto redo;
     } else if (p[1] == '/') {
       /* line comment */
@@ -134,6 +148,15 @@ redo:
           p++;
         }
       }
+
+#ifdef CONFIG_DEBUGGER
+      tp = s->token.ptr;
+      while (tp < p) {
+        unicode_from_utf8(tp, UTF8_CHAR_LEN_MAX, &tp);
+        s->col_num += 1;
+      }
+#endif
+
       goto redo;
     } else if (p[1] == '=') {
       p += 2;
@@ -555,6 +578,14 @@ redo:
            needed to handle HTML comments */
         goto line_terminator;
       default:
+
+#ifdef CONFIG_DEBUGGER
+        tp = s->token.ptr;
+        while (tp < p) {
+          unicode_from_utf8(tp, UTF8_CHAR_LEN_MAX, &tp);
+          s->col_num += 1;
+        }
+#endif
         if (lre_is_space(c)) {
           goto redo;
         } else if (lre_js_is_ident_first(c)) {
@@ -571,9 +602,21 @@ redo:
     p++;
     break;
   }
+
+#ifdef CONFIG_DEBUGGER
+  tp = s->token.ptr;
+  while (tp < p) {
+    unicode_from_utf8(tp, UTF8_CHAR_LEN_MAX, &tp);
+    s->col_num += 1;
+  }
+#endif
+
   s->buf_ptr = p;
 
-  //    dump_token(s, &s->token);
+#ifdef DUMP_TOKEN
+  dump_token(s, &s->token);
+#endif
+
   return 0;
 
 fail:
@@ -697,42 +740,48 @@ int js_unsupported_keyword(JSParseState *s, JSAtom atom) {
 __exception int js_parse_seek_token(JSParseState *s, const JSParsePos *sp) {
   s->token.line_num = sp->last_line_num;
   s->line_num = sp->line_num;
+  s->col_num = sp->col_num;
   s->buf_ptr = sp->ptr;
   s->got_lf = sp->got_lf;
   return next_token(s);
 }
 
 void __attribute((unused)) dump_token(JSParseState *s, const JSToken *token) {
+  int line, col;
+
+  line = token->line_num;
+  col = token->col_num;
   switch (token->val) {
   case TOK_NUMBER: {
     double d;
     JS_ToFloat64(s->ctx, &d, token->u.num.val); /* no exception possible */
-    printf("number: %.14g\n", d);
+    printf("number: %.14g %d:%d\n", d, line, col);
   } break;
   case TOK_IDENT:
   dump_atom : {
     char buf[ATOM_GET_STR_BUF_SIZE];
-    printf("ident: '%s'\n",
-           JS_AtomGetStr(s->ctx, buf, sizeof(buf), token->u.ident.atom));
+    printf("ident: '%s' %d:%d\n",
+           JS_AtomGetStr(s->ctx, buf, sizeof(buf), token->u.ident.atom), line,
+           col);
   } break;
   case TOK_STRING: {
     const char *str;
     /* XXX: quote the string */
     str = JS_ToCString(s->ctx, token->u.str.str);
-    printf("string: '%s'\n", str);
+    printf("string: '%s' %d:%d\n", str, line, col);
     JS_FreeCString(s->ctx, str);
   } break;
   case TOK_TEMPLATE: {
     const char *str;
     str = JS_ToCString(s->ctx, token->u.str.str);
-    printf("template: `%s`\n", str);
+    printf("template: `%s` %d:%d\n", str, line, col);
     JS_FreeCString(s->ctx, str);
   } break;
   case TOK_REGEXP: {
     const char *str, *str2;
     str = JS_ToCString(s->ctx, token->u.regexp.body);
     str2 = JS_ToCString(s->ctx, token->u.regexp.flags);
-    printf("regexp: '%s' '%s'\n", str, str2);
+    printf("regexp: '%s' '%s' %d:%d\n", str, str2, line, col);
     JS_FreeCString(s->ctx, str);
     JS_FreeCString(s->ctx, str2);
   } break;
@@ -743,9 +792,9 @@ void __attribute((unused)) dump_token(JSParseState *s, const JSToken *token) {
     if (s->token.val >= TOK_NULL && s->token.val <= TOK_LAST_KEYWORD) {
       goto dump_atom;
     } else if (s->token.val >= 256) {
-      printf("token: %d\n", token->val);
+      printf("token: %d %d:%d\n", token->val, line, col);
     } else {
-      printf("token: '%c'\n", token->val);
+      printf("token: '%c' %d:%d\n", token->val, line, col);
     }
     break;
   }
@@ -786,6 +835,7 @@ __exception int js_parse_template_part(JSParseState *s, const uint8_t *p) {
     }
     if (c == '\n') {
       s->line_num++;
+      s->col_num = 1;
     } else if (c >= 0x80) {
       const uint8_t *p_next;
       c = unicode_from_utf8(p - 1, UTF8_CHAR_LEN_MAX, &p_next);
@@ -982,8 +1032,10 @@ __exception int js_parse_string(JSParseState *s, int sep, BOOL do_throw,
       case '\n':
         /* ignore escaped newline sequence */
         p++;
-        if (sep != '`')
+        if (sep != '`') {
           s->line_num++;
+          s->col_num = 1;
+        }
         continue;
       default:
         if (c >= '0' && c <= '9') {

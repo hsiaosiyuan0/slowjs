@@ -26,6 +26,11 @@ if(QJS_CONFIG_DEBUGGER)
   target_compile_definitions(quickjs PUBLIC CONFIG_DEBUGGER=y)
 endif()
 
+option(QJS_DUMP_TOKEN "Dump token while parsing" OFF)
+if(QJS_DUMP_TOKEN)
+  target_compile_definitions(quickjs PUBLIC DUMP_TOKEN=y)
+endif()
+
 set(QJS_DUMP_BYTECODE_HELP
     "Dump the bytecode of the compiled functions: combination of bits
 // 1: dump pass 3 final byte code
