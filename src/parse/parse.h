@@ -124,7 +124,9 @@ enum {
 typedef struct JSToken {
   int val;
   int line_num; /* line number of token start, starts from 1 */
-  int col_num;  /* column number of token start, starts from 1 */
+#ifdef CONFIG_DEBUGGER
+  int col_num; /* column number of token start, starts from 1 */
+#endif
   const uint8_t *ptr;
   union {
     struct {
@@ -332,7 +334,9 @@ typedef struct JSParseState {
   JSContext *ctx;
   int last_line_num; /* line number of last token */
   int line_num;      /* line number of current offset, starts from 1 */
-  int col_num;       /* column number of current offset , starts from 1 */
+#ifdef CONFIG_DEBUGGER
+  int col_num; /* column number of current offset , starts from 1 */
+#endif
   const char *filename;
   JSToken token;
   BOOL got_lf; /* true if got line feed before the current token */
@@ -372,7 +376,9 @@ int js_parse_error_reserved_identifier(JSParseState *s);
 typedef struct JSParsePos {
   int last_line_num;
   int line_num;
-	int col_num;
+#ifdef CONFIG_DEBUGGER
+  int col_num;
+#endif
   BOOL got_lf;
   const uint8_t *ptr;
 } JSParsePos;

@@ -48,7 +48,9 @@ int js_parse_error_reserved_identifier(JSParseState *s) {
 int js_parse_get_pos(JSParseState *s, JSParsePos *sp) {
   sp->last_line_num = s->last_line_num;
   sp->line_num = s->token.line_num;
-	sp->col_num = s->token.col_num;
+#ifdef CONFIG_DEBUGGER
+  sp->col_num = s->token.col_num;
+#endif
   sp->ptr = s->token.ptr;
   sp->got_lf = s->got_lf;
   return 0;
