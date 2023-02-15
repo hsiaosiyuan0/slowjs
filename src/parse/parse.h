@@ -3,6 +3,7 @@
 
 #include "def.h"
 
+#include "libs/cutils.h"
 #include "vm/func.h"
 #include "vm/instr.h"
 #include "vm/mod.h"
@@ -124,9 +125,7 @@ enum {
 typedef struct JSToken {
   int val;
   int line_num; /* line number of token start, starts from 1 */
-#ifdef CONFIG_DEBUGGER
   int col_num; /* column number of token start, starts from 1 */
-#endif
   const uint8_t *ptr;
   union {
     struct {
@@ -334,15 +333,14 @@ typedef struct JSParseState {
   JSContext *ctx;
   int last_line_num; /* line number of last token */
   int line_num;      /* line number of current offset, starts from 1 */
-#ifdef CONFIG_DEBUGGER
-  int col_num; /* column number of current offset , starts from 1 */
-#endif
+  int col_num;       /* column number of current offset , starts from 1 */
   const char *filename;
   JSToken token;
   BOOL got_lf; /* true if got line feed before the current token */
   const uint8_t *last_ptr;
   const uint8_t *buf_ptr;
   const uint8_t *buf_end;
+  BOOL debug; /* true if in debug mode */
 
   /* current function code */
   JSFunctionDef *cur_func;
@@ -376,9 +374,7 @@ int js_parse_error_reserved_identifier(JSParseState *s);
 typedef struct JSParsePos {
   int last_line_num;
   int line_num;
-#ifdef CONFIG_DEBUGGER
   int col_num;
-#endif
   BOOL got_lf;
   const uint8_t *ptr;
 } JSParsePos;

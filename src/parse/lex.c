@@ -28,7 +28,6 @@ void skip_shebang(JSParseState *s) {
   }
 }
 
-#ifdef CONFIG_DEBUGGER
 static inline void advance_col(JSParseState *s, const uint8_t *p) {
   const uint8_t *tp = s->token.ptr;
   while (tp < p) {
@@ -36,7 +35,6 @@ static inline void advance_col(JSParseState *s, const uint8_t *p) {
     s->col_num += 1;
   }
 }
-#endif
 
 __exception int next_token(JSParseState *s) {
   const uint8_t *p;
@@ -55,9 +53,7 @@ __exception int next_token(JSParseState *s) {
   s->last_line_num = s->token.line_num;
 redo:
   s->token.line_num = s->line_num;
-#ifdef CONFIG_DEBUGGER
   s->token.col_num = s->col_num;
-#endif
   s->token.ptr = p;
   c = *p;
   switch (c) {
@@ -88,18 +84,14 @@ redo:
   line_terminator:
     s->got_lf = TRUE;
     s->line_num++;
-#ifdef CONFIG_DEBUGGER
     s->col_num = 1;
-#endif
     goto redo;
   case '\f':
   case '\v':
   case ' ':
   case '\t':
     p++;
-#ifdef CONFIG_DEBUGGER
     s->col_num += 1;
-#endif
     goto redo;
   case '/':
     if (p[1] == '*') {
@@ -116,9 +108,7 @@ redo:
         }
         if (*p == '\n') {
           s->line_num++;
-#ifdef CONFIG_DEBUGGER
           s->col_num = 1;
-#endif
           s->got_lf = TRUE; /* considered as LF for ASI */
           p++;
         } else if (*p == '\r') {
@@ -135,11 +125,7 @@ redo:
           p++;
         }
       }
-
-#ifdef CONFIG_DEBUGGER
       advance_col(s, p);
-#endif
-
       goto redo;
     } else if (p[1] == '/') {
       /* line comment */
@@ -163,10 +149,7 @@ redo:
         }
       }
 
-#ifdef CONFIG_DEBUGGER
       advance_col(s, p);
-#endif
-
       goto redo;
     } else if (p[1] == '=') {
       p += 2;
@@ -589,9 +572,7 @@ redo:
         goto line_terminator;
       default:
 
-#ifdef CONFIG_DEBUGGER
         advance_col(s, p);
-#endif
         if (lre_is_space(c)) {
           goto redo;
         } else if (lre_js_is_ident_first(c)) {
@@ -609,10 +590,7 @@ redo:
     break;
   }
 
-#ifdef CONFIG_DEBUGGER
   advance_col(s, p);
-#endif
-
   s->buf_ptr = p;
 
 #ifdef DUMP_TOKEN
@@ -742,9 +720,7 @@ int js_unsupported_keyword(JSParseState *s, JSAtom atom) {
 __exception int js_parse_seek_token(JSParseState *s, const JSParsePos *sp) {
   s->token.line_num = sp->last_line_num;
   s->line_num = sp->line_num;
-#ifdef CONFIG_DEBUGGER
   s->col_num = sp->col_num;
-#endif
   s->buf_ptr = sp->ptr;
   s->got_lf = sp->got_lf;
   return next_token(s);
@@ -754,9 +730,7 @@ void __attribute((unused)) dump_token(JSParseState *s, const JSToken *token) {
   int line, col = 0;
 
   line = token->line_num;
-#ifdef CONFIG_DEBUGGER
   col = token->col_num;
-#endif
   switch (token->val) {
   case TOK_NUMBER: {
     double d;
@@ -841,9 +815,7 @@ __exception int js_parse_template_part(JSParseState *s, const uint8_t *p) {
     }
     if (c == '\n') {
       s->line_num++;
-#ifdef CONFIG_DEBUGGER
       s->col_num = 1;
-#endif
     } else if (c >= 0x80) {
       const uint8_t *p_next;
       c = unicode_from_utf8(p - 1, UTF8_CHAR_LEN_MAX, &p_next);
@@ -1042,9 +1014,7 @@ __exception int js_parse_string(JSParseState *s, int sep, BOOL do_throw,
         p++;
         if (sep != '`') {
           s->line_num++;
-#ifdef CONFIG_DEBUGGER
           s->col_num = 1;
-#endif
         }
         continue;
       default:
