@@ -136,6 +136,7 @@
     "sqrtrem",
     "STRBUF",
     "strstart",
+    "subname",
     "taba",
     "tabr",
     "tdiv",

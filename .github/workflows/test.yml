@@ -23,12 +23,12 @@ jobs:
       - name: Tests Debug build
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "qjs"
+          configurePreset: "default"
           buildPreset: "run-tests"
 
       - name: Tests Release build
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "qjs"
+          configurePreset: "default"
           configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
           buildPreset: "run-tests"

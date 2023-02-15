@@ -17,17 +17,19 @@
 			"vendor": {}
 		},
 		{
-			"name": "qjs",
-			"description": "Compile qjs with debugger support",
+			"name": "dump-token",
+			"description": "Compile qjs to dump token info",
 			"inherits": "default",
-			"cacheVariables": {}
+			"cacheVariables": {
+				"QJS_DUMP_TOKEN": "y"
+			}
 		}
 	],
 	"buildPresets": [
 		{
 			"name": "qjs",
 			"description": "Build the command line interface of quickjs",
-			"configurePreset": "qjs",
+			"configurePreset": "default",
 			"targets": [
 				"qjs"
 			]
@@ -37,6 +39,13 @@
 			"configurePreset": "default",
 			"targets": [
 				"run-tests"
+			]
+		},
+		{
+			"name": "test-col",
+			"configurePreset": "dump-token",
+			"targets": [
+				"test-col"
 			]
 		},
 		{
