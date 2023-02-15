@@ -60,4 +60,3 @@ add_custom_target(
   JOB_POOL console)
 
 add_subdirectory(run-test262)
-add_subdirectory(http EXCLUDE_FROM_ALL)

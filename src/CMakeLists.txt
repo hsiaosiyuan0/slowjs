@@ -21,11 +21,6 @@ endif()
 # force the `LTO` to keep the unused functions for exporting them to c modules
 target_link_options(quickjs PUBLIC -rdynamic)
 
-option(QJS_CONFIG_DEBUGGER "Enable debugger support" OFF)
-if(QJS_CONFIG_DEBUGGER)
-  target_compile_definitions(quickjs PUBLIC CONFIG_DEBUGGER=y)
-endif()
-
 option(QJS_DUMP_TOKEN "Dump token while parsing" OFF)
 if(QJS_DUMP_TOKEN)
   target_compile_definitions(quickjs PUBLIC DUMP_TOKEN=y)
