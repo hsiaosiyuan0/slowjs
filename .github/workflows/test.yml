@@ -20,15 +20,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Tests Debug build
+      - name: debug:run-tests
         uses: lukka/run-cmake@v10
         with:
           configurePreset: "default"
           buildPreset: "run-tests"
 
-      - name: Tests Release build
+      - name: release:run-tests
         uses: lukka/run-cmake@v10
         with:
           configurePreset: "default"
           configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
           buildPreset: "run-tests"
+
+      - name: debug:test-col
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "dump-token"
+          buildPreset: "test-col"
+
+      - name: release:test-col
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "dump-token"
+          configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
+          buildPreset: "test-col"
+
+      - name: debug:test-op_col_num
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "dump-bytecode-2"
+          buildPreset: "test-op_col_num"
+
+      - name: release:test-op_col_num
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "dump-bytecode-2"
+          configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
+          buildPreset: "test-op_col_num"
