@@ -1,7 +1,10 @@
 var a = 1;
 let b = 1,
-	c;
+  c;
 const d = 1;
+
+const fn = () => {};
+const obj = { d: fn() };
 
 /* EXPECT(a):
 ident: 'a' 1:5
@@ -16,11 +19,15 @@ number: 1 2:9
 */
 
 /* EXPECT(c):
-ident: 'c' 3:2
+ident: 'c' 3:3
 */
 
 /* EXPECT(d):
 ident: 'd' 4:7
 token: '=' 4:9
 number: 1 4:11
+*/
+
+/* EXPECT(fn):
+ident: 'fn' 7:18
 */

@@ -1,3 +1,4 @@
+#include "libs/cutils.h"
 #include "parse.h"
 
 #include "utils/dbuf.h"
@@ -922,6 +923,7 @@ static int get_label_pos(JSFunctionDef *s, int label) {
     for (;;) {
       switch (s->byte_code.buf[pos]) {
       case OP_line_num:
+      case OP_col_num:
       case OP_label:
         pos += 5;
         continue;
@@ -1780,6 +1782,9 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
          compressed table to reduce memory usage and get better
          performance */
       line_num = get_u32(bc_buf + pos + 1);
+      break;
+    case OP_col_num:
+      get_u32(bc_buf + pos + 1);
       break;
 
     case OP_label: {
@@ -2688,6 +2693,10 @@ BOOL code_match(CodeContext *s, int pos, ...) {
     case OP_FMT_label:
     case OP_FMT_const: {
       s->label = get_u32(tab + pos);
+      break;
+    }
+    case OP_FMT_u64: {
+      s->label = get_u64(tab + pos);
       break;
     }
     case OP_FMT_label_u16: {

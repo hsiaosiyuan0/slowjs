@@ -23,6 +23,14 @@
 			"cacheVariables": {
 				"QJS_DUMP_TOKEN": "y"
 			}
+		},
+    {
+			"name": "dump-bytecode-2",
+			"description": "Compile qjs to dump bytecode",
+			"inherits": "default",
+			"cacheVariables": {
+				"QJS_DUMP_BYTECODE": "2"
+			}
 		}
 	],
 	"buildPresets": [
@@ -46,6 +54,13 @@
 			"configurePreset": "dump-token",
 			"targets": [
 				"test-col"
+			]
+		},
+    {
+			"name": "test-op_col_num",
+			"configurePreset": "dump-bytecode-2",
+			"targets": [
+				"test-op_col_num"
 			]
 		},
 		{

@@ -5,8 +5,10 @@
 #include "intrins/intrins.h"
 #include "num.h"
 #include "obj.h"
+#include "parse/parse.h"
 #include "shape.h"
 #include "str.h"
+#include <stdint.h>
 
 __maybe_unused void JS_DumpString(JSRuntime *rt, const JSString *p) {
   int i, c, sep;
@@ -471,6 +473,19 @@ void dump_byte_code(JSContext *ctx, int pass, const uint8_t *tab, int len,
       break;
     case OP_FMT_u32:
       printf(" %u", get_u32(tab + pos));
+      break;
+    case OP_FMT_u64:
+      if (op == OP_col_num) {
+        uint64_t fat = get_u64(tab + pos);
+        int line_num = line_num_of_fat(fat);
+        if (line_num) {
+          printf(" %u:%u", line_num, col_num_of_fat(fat));
+        } else {
+          printf(" %u", col_num_of_fat(fat));
+        }
+      } else {
+        printf(" %llu", get_u64(tab + pos));
+      }
       break;
 #if SHORT_OPCODES
     case OP_FMT_label8:

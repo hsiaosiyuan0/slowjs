@@ -65,4 +65,10 @@ add_custom_target(
   DEPENDS qjs
   JOB_POOL console)
 
+add_custom_target(
+  test-op_col_num
+  COMMAND ${QJS} "${PROJECT_SOURCE_DIR}/tests/test-op_col_num/run-tests.js"
+  DEPENDS qjs
+  JOB_POOL console)
+
 add_subdirectory(run-test262)

@@ -1,3 +1,4 @@
+#include "libs/cutils.h"
 #include "parse.h"
 
 BOOL js_is_live_code(JSParseState *s) {
@@ -45,6 +46,13 @@ void emit_op(JSParseState *s, uint8_t val) {
     dbuf_put_u32(bc, s->last_line_num);
     fd->last_opcode_line_num = s->last_line_num;
   }
+
+  if (s->col_num2emit != 0) {
+    dbuf_putc(bc, OP_col_num);
+    dbuf_put_u64(bc, s->col_num2emit);
+    s->col_num2emit = 0;
+  }
+
   fd->last_opcode_pos = bc->size;
   dbuf_putc(bc, val);
 }

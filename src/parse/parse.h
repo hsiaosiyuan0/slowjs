@@ -8,6 +8,7 @@
 #include "vm/instr.h"
 #include "vm/mod.h"
 #include "vm/str.h"
+#include <stdint.h>
 
 enum {
   TOK_NUMBER = -128,
@@ -125,7 +126,7 @@ enum {
 typedef struct JSToken {
   int val;
   int line_num; /* line number of token start, starts from 1 */
-  int col_num; /* column number of token start, starts from 1 */
+  int col_num;  /* column number of token start, starts from 1 */
   const uint8_t *ptr;
   union {
     struct {
@@ -291,6 +292,7 @@ typedef struct JSFunctionDef {
   DynBuf byte_code;
   int last_opcode_pos; /* -1 if no last opcode */
   int last_opcode_line_num;
+  int last_opcode_col_num;
   BOOL use_short_opcodes; /* true if short opcodes are used in byte_code */
 
   LabelSlot *label_slots;
@@ -329,11 +331,21 @@ typedef struct JSFunctionDef {
   JSModuleDef *module; /* != NULL when parsing a module */
 } JSFunctionDef;
 
+#define fat_col_num(line_num, col_num) ((uint64_t)line_num << 32 | col_num)
+#define line_num_of_fat(fat) ((int)(fat >> 32))
+#define col_num_of_fat(fat) ((int)fat)
+
 typedef struct JSParseState {
   JSContext *ctx;
   int last_line_num; /* line number of last token */
   int line_num;      /* line number of current offset, starts from 1 */
   int col_num;       /* column number of current offset , starts from 1 */
+  // column number to emit in bytecode stream, `0` to skip emitting, use
+  // `uint64_t` as its size since we will encode line in it when bytecode and
+  // its source are in different lines, a typical case is the forin-loop, the
+  // `cont-part` is on the top while its bytecode(`for_in_next`) is on the
+  // bottom
+  uint64_t col_num2emit;
   const char *filename;
   JSToken token;
   BOOL got_lf; /* true if got line feed before the current token */
