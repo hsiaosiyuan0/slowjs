@@ -1,6 +1,4 @@
 #include "parse.h"
-#include <stdint.h>
-#include <stdio.h>
 
 __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask);
 
@@ -152,7 +150,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
     return -1;
 
   // col_num of token after `in` or `of`
-  col_num = fat_col_num(s->token.line_num, s->token.col_num);
+  col_num = LINECOL(s->token.line_num, s->token.col_num);
   if (is_for_of) {
     if (js_parse_assign_expr(s))
       return -1;
@@ -404,7 +402,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
 
     if (js_parse_expect(s, '('))
       goto fail;
-    col_num = fat_col_num(s->token.line_num, s->token.col_num);
+    col_num = LINECOL(s->token.line_num, s->token.col_num);
     if (js_parse_expr(s))
       goto fail;
     if (js_parse_expect(s, ')'))
@@ -448,7 +446,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
 
     if (js_parse_expect(s, '('))
       goto fail;
-    col_num = fat_col_num(s->token.line_num, s->token.col_num);
+    col_num = LINECOL(s->token.line_num, s->token.col_num);
     if (js_parse_expr(s))
       goto fail;
     if (js_parse_expect(s, ')'))
@@ -547,7 +545,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
       label_test = label_body;
     } else {
       emit_label(s, label_test);
-      col_num = fat_col_num(s->token.line_num, s->token.col_num);
+      col_num = LINECOL(s->token.line_num, s->token.col_num);
       if (js_parse_expr(s))
         goto fail;
       s->col_num2emit = col_num;
@@ -566,7 +564,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
 
       pos_cont = s->cur_func->byte_code.size;
       emit_label(s, label_cont);
-      s->col_num2emit = fat_col_num(s->token.line_num, s->token.col_num);
+      s->col_num2emit = LINECOL(s->token.line_num, s->token.col_num);
       if (js_parse_expr(s))
         goto fail;
       emit_op(s, OP_drop);

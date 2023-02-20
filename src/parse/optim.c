@@ -923,9 +923,11 @@ static int get_label_pos(JSFunctionDef *s, int label) {
     for (;;) {
       switch (s->byte_code.buf[pos]) {
       case OP_line_num:
-      case OP_col_num:
       case OP_label:
         pos += 5;
+        continue;
+      case OP_col_num:
+        pos += 9;
         continue;
       case OP_goto:
         label = get_u32(s->byte_code.buf + pos + 1);
@@ -1204,12 +1206,13 @@ static void put_short_code(DynBuf *bc_out, int op, int idx) {
    variables when necessary */
 __exception int resolve_variables(JSContext *ctx, JSFunctionDef *s) {
   int pos, pos_next, bc_len, op, len, i, idx, line_num;
-  uint8_t *bc_buf;
+  uint8_t *bc_buf; // bytecodes from previous phase
   JSAtom var_name;
-  DynBuf bc_out;
+  DynBuf bc_out; // the buffer to save the results of current subroutine
   CodeContext cc;
   int scope;
 
+  // cc make conditions base on the bytecodes from previous phase
   cc.bc_buf = bc_buf = s->byte_code.buf;
   cc.bc_len = bc_len = s->byte_code.size;
   js_dbuf_init(ctx, &bc_out);
@@ -1259,6 +1262,10 @@ __exception int resolve_variables(JSContext *ctx, JSFunctionDef *s) {
     switch (op) {
     case OP_line_num:
       line_num = get_u32(bc_buf + pos + 1);
+      s->line_number_size++;
+      goto no_change;
+
+    case OP_col_num:
       s->line_number_size++;
       goto no_change;
 
@@ -1545,15 +1552,25 @@ fail:
 }
 
 /* the pc2line table gives a line number for each PC value */
-static void add_pc2line_info(JSFunctionDef *s, uint32_t pc, int line_num) {
+static void add_pc2line_info(JSFunctionDef *s, uint32_t pc, int line_num,
+                             int col_num) {
+  BOOL line_changed = FALSE, col_changed = FALSE;
   if (s->line_number_slots != NULL &&
       s->line_number_count < s->line_number_size &&
-      pc >= s->line_number_last_pc && line_num != s->line_number_last) {
+      pc >= s->line_number_last_pc &&
+      ((line_changed = (line_num != s->line_number_last)) ||
+       (line_num != 0 && (col_changed = (col_num > s->col_number_last))))) {
     s->line_number_slots[s->line_number_count].pc = pc;
     s->line_number_slots[s->line_number_count].line_num = line_num;
+    s->line_number_slots[s->line_number_count].col_num = col_num;
     s->line_number_count++;
     s->line_number_last_pc = pc;
-    s->line_number_last = line_num;
+    if (line_changed) {
+      s->line_number_last = line_num;
+      s->col_number_last = 0;
+    }
+    if (col_changed)
+      s->col_number_last = col_num;
   }
 }
 
@@ -1567,9 +1584,10 @@ static void compute_pc2line_info(JSFunctionDef *s) {
     for (i = 0; i < s->line_number_count; i++) {
       uint32_t pc = s->line_number_slots[i].pc;
       int line_num = s->line_number_slots[i].line_num;
+      int col_num = s->line_number_slots[i].col_num;
       int diff_pc, diff_line;
 
-      if (line_num < 0)
+      if (line_num <= 0)
         continue;
 
       diff_pc = pc - last_pc;
@@ -1582,11 +1600,13 @@ static void compute_pc2line_info(JSFunctionDef *s) {
           diff_pc <= PC2LINE_DIFF_PC_MAX) {
         dbuf_putc(&s->pc2line, (diff_line - PC2LINE_BASE) +
                                    diff_pc * PC2LINE_RANGE + PC2LINE_OP_FIRST);
+        dbuf_put_sleb128(&s->pc2line, col_num);
       } else {
         /* longer encoding */
         dbuf_putc(&s->pc2line, 0);
         dbuf_put_leb128(&s->pc2line, diff_pc);
         dbuf_put_sleb128(&s->pc2line, diff_line);
+        dbuf_put_sleb128(&s->pc2line, col_num);
       }
       last_pc = pc;
       last_line_num = line_num;
@@ -1612,6 +1632,10 @@ static BOOL code_has_label(CodeContext *s, int pos, int label) {
     int op = s->bc_buf[pos];
     if (op == OP_line_num) {
       pos += 5;
+      continue;
+    }
+    if (op == OP_col_num) {
+      pos += 9;
       continue;
     }
     if (op == OP_label) {
@@ -1675,9 +1699,11 @@ done:
 
 /* peephole optimizations and resolve goto/labels */
 __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
-  int pos, pos_next, bc_len, op, op1, len, i, line_num;
-  const uint8_t *bc_buf;
-  DynBuf bc_out;
+  int pos, pos_next, bc_len, op, op1, len, i, line_num, pos_prev, col_num = 0,
+                                                                  force_line;
+  uint64_t linecol;
+  const uint8_t *bc_buf; // the bytecodes from previous phase
+  DynBuf bc_out;         // the buffer to save the results of current subroutine
   LabelSlot *label_slots, *ls;
   RelocEntry *re, *re_next;
   CodeContext cc;
@@ -1690,6 +1716,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
 
   line_num = s->line_num;
 
+  // cc make conditions base the bytecodes from previous phases
   cc.bc_buf = bc_buf = s->byte_code.buf;
   cc.bc_len = bc_len = s->byte_code.size;
   js_dbuf_init(ctx, &bc_out);
@@ -1708,6 +1735,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
     if (s->line_number_slots == NULL)
       return -1;
     s->line_number_last = s->line_num;
+    s->col_number_last = 0;
     s->line_number_last_pc = 0;
   }
 
@@ -1771,11 +1799,25 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
     put_short_code(&bc_out, OP_put_loc, s->arg_var_object_idx);
   }
 
-  for (pos = 0; pos < bc_len; pos = pos_next) {
+  for (pos = 0, pos_prev = 0; pos < bc_len; pos_prev = pos, pos = pos_next) {
     int val;
     op = bc_buf[pos];
     len = opcode_info[op].size;
     pos_next = pos + len;
+
+#define RESOLVE_LINECOL(p)                                                     \
+  do {                                                                         \
+    int pp = p ? p : pos_prev;                                                 \
+    int prev_op = bc_buf[pp];                                                  \
+    if (prev_op == OP_col_num) {                                               \
+      linecol = get_u64(bc_buf + pp + 1);                                      \
+      force_line = LINECOL_LINE(linecol);                                      \
+      if (force_line)                                                          \
+        line_num = force_line;                                                 \
+      col_num = LINECOL_COL(linecol);                                          \
+    }                                                                          \
+  } while (0)
+
     switch (op) {
     case OP_line_num:
       /* line number info (for debug). We put it in a separate
@@ -1784,7 +1826,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
       line_num = get_u32(bc_buf + pos + 1);
       break;
     case OP_col_num:
-      get_u32(bc_buf + pos + 1);
+      // do nothing here, the pc2line info will be generated when we process the
+      // opcode and find out its previous opcode was `OP_col_num`
       break;
 
     case OP_label: {
@@ -1823,12 +1866,13 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
       if (code_match(&cc, pos_next, OP_return, -1)) {
         if (cc.line_num >= 0)
           line_num = cc.line_num;
-        add_pc2line_info(s, bc_out.size, line_num);
+        add_pc2line_info(s, bc_out.size, line_num, 0);
         put_short_code(&bc_out, op + 1, argc);
         pos_next = skip_dead_code(s, bc_buf, bc_len, cc.pos, &line_num);
         break;
       }
-      add_pc2line_info(s, bc_out.size, line_num);
+      RESOLVE_LINECOL(0);
+      add_pc2line_info(s, bc_out.size, line_num, col_num);
       put_short_code(&bc_out, op, argc);
       break;
     }
@@ -1859,7 +1903,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
           /* updating the line number obfuscates assembly listing */
           // if (line1 >= 0) line_num = line1;
           update_label(s, label, -1);
-          add_pc2line_info(s, bc_out.size, line_num);
+          add_pc2line_info(s, bc_out.size, line_num, 0);
           dbuf_putc(&bc_out, op1);
           pos_next = skip_dead_code(s, bc_buf, bc_len, pos_next, &line_num);
           break;
@@ -1917,7 +1961,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
         }
       }
     has_label:
-      add_pc2line_info(s, bc_out.size, line_num);
+      RESOLVE_LINECOL(0);
+      add_pc2line_info(s, bc_out.size, line_num, col_num);
       if (op == OP_goto) {
         pos_next = skip_dead_code(s, bc_buf, bc_len, pos_next, &line_num);
       }
@@ -1995,7 +2040,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
       }
       assert(label >= 0 && label < s->label_count);
       ls = &label_slots[label];
-      add_pc2line_info(s, bc_out.size, line_num);
+      RESOLVE_LINECOL(0);
+      add_pc2line_info(s, bc_out.size, line_num, col_num);
 #if SHORT_OPCODES
       jp = &s->jump_slots[s->jump_count++];
       jp->op = op;
@@ -2032,7 +2078,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
         if (code_match(&cc, pos_next, OP_strict_eq, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, OP_is_null);
           pos_next = cc.pos;
           break;
@@ -2043,7 +2090,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        M2(OP_if_false, OP_if_true), -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, OP_is_null);
           pos_next = cc.pos;
           label = cc.label;
@@ -2093,7 +2141,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
             if (cc.line_num >= 0)
               line_num = cc.line_num;
           } else {
-            add_pc2line_info(s, bc_out.size, line_num);
+            add_pc2line_info(s, bc_out.size, line_num, 0);
             push_short_int(&bc_out, -val);
           }
           pos_next = cc.pos;
@@ -2111,7 +2159,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
           val = (val != 0);
           goto has_constant_test;
         }
-        add_pc2line_info(s, bc_out.size, line_num);
+        add_pc2line_info(s, bc_out.size, line_num, 0);
         push_short_int(&bc_out, val);
         break;
       }
@@ -2123,7 +2171,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
       if (OPTIMIZE) {
         int idx = get_u32(bc_buf + pos + 1);
         if (idx < 256) {
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, OP_push_const8 + op - OP_push_const);
           dbuf_putc(&bc_out, idx);
           break;
@@ -2136,7 +2185,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
         JSAtom atom = get_u32(bc_buf + pos + 1);
         if (atom == JS_ATOM_length) {
           JS_FreeAtom(ctx, atom);
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, OP_get_length);
           break;
         }
@@ -2157,7 +2207,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
 #if SHORT_OPCODES
         if (atom == JS_ATOM_empty_string) {
           JS_FreeAtom(ctx, atom);
-          add_pc2line_info(s, bc_out.size, line_num);
+          add_pc2line_info(s, bc_out.size, line_num, 0);
           dbuf_putc(&bc_out, OP_push_empty_string);
           break;
         }
@@ -2197,7 +2247,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
         if (code_match(&cc, pos_next, OP_return, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, OP_return_undef);
           pos_next = cc.pos;
           break;
@@ -2212,7 +2263,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
         if (code_match(&cc, pos_next, OP_strict_eq, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, OP_is_undefined);
           pos_next = cc.pos;
           break;
@@ -2223,7 +2275,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        M2(OP_if_false, OP_if_true), -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, OP_is_undefined);
           pos_next = cc.pos;
           label = cc.label;
@@ -2244,7 +2297,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        OP_drop, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, cc.op);
           dbuf_put_u32(&bc_out, cc.atom);
           pos_next = cc.pos;
@@ -2275,7 +2329,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
               pos_next = cc.pos;
             }
           }
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           put_short_code(&bc_out, op1, cc.idx);
           if (line2 >= 0)
             line_num = line2;
@@ -2302,7 +2357,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        idx, OP_drop, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           dbuf_putc(&bc_out, (cc.op == OP_inc || cc.op == OP_post_inc)
                                  ? OP_inc_loc
                                  : OP_dec_loc);
@@ -2318,7 +2374,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        OP_put_loc, idx, OP_drop, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
 #if SHORT_OPCODES
           if (cc.atom == JS_ATOM_empty_string) {
             JS_FreeAtom(ctx, cc.atom);
@@ -2342,7 +2399,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        idx, OP_drop, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           push_short_int(&bc_out, cc.label);
           dbuf_putc(&bc_out, OP_add_loc);
           dbuf_putc(&bc_out, idx);
@@ -2360,14 +2418,16 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        OP_dup, OP_put_loc, idx, OP_drop, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           put_short_code(&bc_out, cc.op, cc.idx);
           dbuf_putc(&bc_out, OP_add_loc);
           dbuf_putc(&bc_out, idx);
           pos_next = cc.pos;
           break;
         }
-        add_pc2line_info(s, bc_out.size, line_num);
+        RESOLVE_LINECOL(0);
+        add_pc2line_info(s, bc_out.size, line_num, col_num);
         put_short_code(&bc_out, op, idx);
         break;
       }
@@ -2378,7 +2438,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
       if (OPTIMIZE) {
         int idx;
         idx = get_u16(bc_buf + pos + 1);
-        add_pc2line_info(s, bc_out.size, line_num);
+        add_pc2line_info(s, bc_out.size, line_num, 0);
         put_short_code(&bc_out, op, idx);
         break;
       }
@@ -2394,12 +2454,14 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
         if (code_match(&cc, pos_next, op - 1, idx, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          RESOLVE_LINECOL(0);
+          add_pc2line_info(s, bc_out.size, line_num, col_num);
           put_short_code(&bc_out, op + 1, idx);
           pos_next = cc.pos;
           break;
         }
-        add_pc2line_info(s, bc_out.size, line_num);
+        RESOLVE_LINECOL(0);
+        add_pc2line_info(s, bc_out.size, line_num, col_num);
         put_short_code(&bc_out, op, idx);
         break;
       }
@@ -2429,7 +2491,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
             op1 += 1; /* put_x(n) get_x(n) -> set_x(n) */
             pos_next = cc.pos;
           }
-          add_pc2line_info(s, bc_out.size, line_num);
+          add_pc2line_info(s, bc_out.size, line_num, 0);
           dbuf_putc(&bc_out, OP_dec + (op - OP_post_dec));
           put_short_code(&bc_out, op1, idx);
           break;
@@ -2438,7 +2500,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                        M2(OP_put_field, OP_put_var_strict), OP_drop, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          add_pc2line_info(s, bc_out.size, line_num, 0);
           dbuf_putc(&bc_out, OP_dec + (op - OP_post_dec));
           dbuf_putc(&bc_out, cc.op);
           dbuf_put_u32(&bc_out, cc.atom);
@@ -2448,7 +2510,7 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
         if (code_match(&cc, pos_next, OP_perm4, OP_put_array_el, OP_drop, -1)) {
           if (cc.line_num >= 0)
             line_num = cc.line_num;
-          add_pc2line_info(s, bc_out.size, line_num);
+          add_pc2line_info(s, bc_out.size, line_num, 0);
           dbuf_putc(&bc_out, OP_dec + (op - OP_post_dec));
           dbuf_putc(&bc_out, OP_put_array_el);
           pos_next = cc.pos;
@@ -2479,7 +2541,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
           if (op2 >= 0) {
             /* transform typeof(s) == "<type>" into is_<type> */
             if (op1 == OP_strict_eq) {
-              add_pc2line_info(s, bc_out.size, line_num);
+              RESOLVE_LINECOL(0);
+              add_pc2line_info(s, bc_out.size, line_num, col_num);
               dbuf_putc(&bc_out, op2);
               JS_FreeAtom(ctx, cc.atom);
               pos_next = cc.pos;
@@ -2491,7 +2554,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
                */
               if (cc.line_num >= 0)
                 line_num = cc.line_num;
-              add_pc2line_info(s, bc_out.size, line_num);
+              RESOLVE_LINECOL(0);
+              add_pc2line_info(s, bc_out.size, line_num, col_num);
               dbuf_putc(&bc_out, op2);
               JS_FreeAtom(ctx, cc.atom);
               pos_next = cc.pos;
@@ -2507,7 +2571,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
 
     default:
     no_change:
-      add_pc2line_info(s, bc_out.size, line_num);
+      RESOLVE_LINECOL(0);
+      add_pc2line_info(s, bc_out.size, line_num, col_num);
       dbuf_put(&bc_out, bc_buf + pos, len);
       break;
     }
@@ -2645,11 +2710,14 @@ BOOL code_match(CodeContext *s, int pos, ...) {
       if (op == OP_line_num) {
         line_num = get_u32(tab + pos + 1);
         pos = pos_next;
+      } else if (op == OP_col_num) {
+        pos = pos_next;
       } else {
         break;
       }
     }
     if (op != op1) {
+      // only one op to compare and the source op is empty
       if (op1 == (uint8_t)op1 || !op)
         break;
       if (op != (uint8_t)op1 && op != (uint8_t)(op1 >> 8) &&
@@ -2695,10 +2763,6 @@ BOOL code_match(CodeContext *s, int pos, ...) {
       s->label = get_u32(tab + pos);
       break;
     }
-    case OP_FMT_u64: {
-      s->label = get_u64(tab + pos);
-      break;
-    }
     case OP_FMT_label_u16: {
       s->label = get_u32(tab + pos);
       s->val = get_u16(tab + pos + 4);
@@ -2734,6 +2798,32 @@ done:
   return ret;
 }
 
+// find out the first inuse `label` after `pos` and discard the bytecodes
+// between them
+//
+// `pos` is the position of bytecode which stops its subsequent bytecodes:
+//
+// ```
+// pos: xxx
+//      xxx
+//      xxx
+// ```
+//
+// but there is an exception, if there is a `jump`  operation somewhere
+// references the subsequent position after the `pos`, assume it as `pos1`:
+//
+// ```
+//       jump pos1
+// pos:  xxx
+//       xxx
+// pos1: xxx
+//       xxx
+//
+// the bytecodes starts from `pos1` can not be treated as dead code, the jump
+// destination is represented by `label`(in above example it's `pos1`)
+//
+// if the bytecodes in the dead range refer other labels, then that labels being
+// referred need to decrease their reference count
 int skip_dead_code(JSFunctionDef *s, const uint8_t *bc_buf, int bc_len, int pos,
                    int *linep) {
   int op, len, label;

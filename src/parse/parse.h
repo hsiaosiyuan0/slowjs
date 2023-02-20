@@ -8,7 +8,6 @@
 #include "vm/instr.h"
 #include "vm/mod.h"
 #include "vm/str.h"
-#include <stdint.h>
 
 enum {
   TOK_NUMBER = -128,
@@ -196,6 +195,7 @@ typedef struct LabelSlot {
 typedef struct LineNumberSlot {
   uint32_t pc;
   int line_num;
+  int col_num;
 } LineNumberSlot;
 
 typedef enum JSParseFunctionEnum {
@@ -318,6 +318,7 @@ typedef struct JSFunctionDef {
   int line_number_size;
   int line_number_count;
   int line_number_last;
+  int col_number_last;
   int line_number_last_pc;
 
   /* pc2line table */
@@ -331,9 +332,9 @@ typedef struct JSFunctionDef {
   JSModuleDef *module; /* != NULL when parsing a module */
 } JSFunctionDef;
 
-#define fat_col_num(line_num, col_num) ((uint64_t)line_num << 32 | col_num)
-#define line_num_of_fat(fat) ((int)(fat >> 32))
-#define col_num_of_fat(fat) ((int)fat)
+#define LINECOL(line_num, col_num) ((uint64_t)line_num << 32 | col_num)
+#define LINECOL_LINE(lc) ((int)(lc >> 32))
+#define LINECOL_COL(lc) ((int)lc)
 
 typedef struct JSParseState {
   JSContext *ctx;

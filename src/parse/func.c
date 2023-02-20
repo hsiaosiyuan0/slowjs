@@ -1361,6 +1361,12 @@ JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd) {
   }
 #endif
 
+  // phase2:
+  // 1. remove `nop`
+  // 2. process the bytecode which used to manipulate the variables, eg:
+  //    - according `enter_scope` and `leave_scope` to do the variable resolution
+  //      and remove them out from the bytecode stream flows to the next phase
+  //    - turn `scope_get_var` to the actual bytecode
   if (resolve_variables(ctx, fd))
     goto fail;
 
@@ -1375,6 +1381,8 @@ JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd) {
   }
 #endif
 
+  // phase3:
+  // 1. process `line_num`
   if (resolve_labels(ctx, fd))
     goto fail;
 
