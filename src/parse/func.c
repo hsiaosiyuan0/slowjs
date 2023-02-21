@@ -1185,10 +1185,6 @@ JSFunctionDef *js_new_function_def(JSContext *ctx, JSFunctionDef *parent,
   fd->line_num = line_num;
 
   js_dbuf_init(ctx, &fd->pc2line);
-  // fd->pc2line_last_line_num = line_num;
-  // fd->pc2line_last_pc = 0;
-  fd->last_opcode_line_num = line_num;
-  fd->col_number_last = -1;
 
   return fd;
 }
@@ -1209,7 +1205,7 @@ void js_free_function_def(JSContext *ctx, JSFunctionDef *fd) {
   dbuf_free(&fd->byte_code);
   js_free(ctx, fd->jump_slots);
   js_free(ctx, fd->label_slots);
-  js_free(ctx, fd->line_number_slots);
+  js_free(ctx, fd->loc_slots);
 
   for (i = 0; i < fd->cpool_count; i++) {
     JS_FreeValue(ctx, fd->cpool[i]);

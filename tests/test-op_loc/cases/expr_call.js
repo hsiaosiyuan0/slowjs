@@ -8,36 +8,34 @@ obj["f1"]();
 obj["b"]["f2"]();
 
 /* EXPECT(()=>{}):
-        col_num 12
+        loc 1:12
         put_var_init fn
 */
 
-/* EXPECT(f):
-        col_num 15
+/* EXPECT(e: f):
+        loc 4:15
         put_var_init f
 */
 
-/* EXPECT(fn):
+/* EXPECT(d: fn):
         get_var fn
-        col_num 37
+        loc 4:39
         call 0
 */
 
 /* EXPECT(obj.f1()):
-        get_var obj
-        col_num 5
+        loc 5:5
         get_field2 f1
-        col_num 7
+        loc 5:7
         call_method 0
 */
 
 /* EXPECT(obj.b.f2()):
-        get_var obj
-        col_num 5
+        loc 6:5
         get_field b
-        col_num 7
+        loc 6:7
         get_field2 f2
-        col_num 9
+        loc 6:9
         call_method 0
 */
 
@@ -45,12 +43,14 @@ obj["b"]["f2"]();
         get_var obj
         push_atom_value f1
         get_array_el2
-        col_num 10
+        loc 7:10
+        call_method 0
 */
 
 /* EXPECT(obj["b"]["f2"]()):
+        get_array_el
         push_atom_value f2
         get_array_el2
-        col_num 15
+        loc 8:15
         call_method 0
 */

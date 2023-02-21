@@ -11,25 +11,22 @@ switch (a) {
 }
 
 /* EXPECT(case "a"):
-        line_num 5
-        col_num 5
+        loc 5:5
         get_var print
         push_atom_value a
-        col_num 5
+        loc 5:10
         call 1
 */
 
 /* EXPECT(break b):
-        line_num 8
-        col_num 5
-        goto 1:230
+        loc 8:5
+        goto 1:175
 */
 
 /* EXPECT(default):
-        line_num 10
-        col_num 5
+        loc 10:5
         get_var print
         get_var a
-        col_num 5
+        loc 10:10
         call 1
 */

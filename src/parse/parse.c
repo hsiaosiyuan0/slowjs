@@ -12,7 +12,7 @@ void js_parse_init(JSContext *ctx, JSParseState *s, const char *input,
   s->token.val = ' ';
   s->token.line_num = 1;
   s->token.col_num = 1;
-  s->col_num2emit = 0;
+  s->loc = 0;
 }
 
 __exception int js_parse_program(JSParseState *s) {

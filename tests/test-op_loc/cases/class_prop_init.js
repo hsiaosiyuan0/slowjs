@@ -5,6 +5,6 @@ class c {
 
 /* EXPECT(a = f())):
         get_var f
-        col_num 7
+        loc 3:8
         call 0
 */

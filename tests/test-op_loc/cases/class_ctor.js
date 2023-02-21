@@ -15,24 +15,27 @@ const a = {
 2 + new c().f2();
 
 /* EXPECT(= a):
-        col_num 14
+        loc 3:14
         insert2
         put_field a
 */
 
 /* EXPECT(new a.f1(1)):
+        loc 14:11
         get_field f1
         dup
         push_i32 1
-        col_num 5
+        loc 14:13
         call_constructor 1
 */
 
 /* EXPECT(new c().f2()):
-        col_num 5
+        get_var c
+        dup
+        loc 15:10
         call_constructor 0
-        col_num 13
+        loc 15:13
         get_field2 f2
-        col_num 15
+        loc 15:15
         call_method 0
 */

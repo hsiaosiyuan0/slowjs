@@ -57,10 +57,10 @@
 			]
 		},
     {
-			"name": "test-op_col_num",
+			"name": "test-op_loc",
 			"configurePreset": "dump-bytecode-2",
 			"targets": [
-				"test-op_col_num"
+				"test-op_loc"
 			]
 		},
 		{

@@ -6,26 +6,26 @@ let e;
 var f;  
 
 /* EXPECT(a):
-        col_num 9
+        loc 1:9
         put_var a
 */
 
 /* EXPECT(b):
-        col_num 9
+        loc 2:9
         put_var_init b
 */
 
 /* EXPECT(c):
-        col_num 11
+        loc 3:11
         put_var_init c
 */
 
 /* EXPECT(d):
-        col_num 7
+        loc 4:7
         put_var_init d
 */
 
 /* EXPECT(e):
-        col_num 5
+        loc 5:5
         put_var_init e
 */

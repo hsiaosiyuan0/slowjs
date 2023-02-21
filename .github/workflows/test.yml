@@ -46,15 +46,15 @@ jobs:
           configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
           buildPreset: "test-col"
 
-      - name: debug:test-op_col_num
+      - name: debug:test-op_loc
         uses: lukka/run-cmake@v10
         with:
           configurePreset: "dump-bytecode-2"
-          buildPreset: "test-op_col_num"
+          buildPreset: "test-op_loc"
 
-      - name: release:test-op_col_num
+      - name: release:test-op_loc
         uses: lukka/run-cmake@v10
         with:
           configurePreset: "dump-bytecode-2"
           configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
-          buildPreset: "test-op_col_num"
+          buildPreset: "test-op_loc"

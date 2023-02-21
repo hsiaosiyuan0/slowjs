@@ -397,8 +397,8 @@ void dump_byte_code(JSContext *ctx, int pass, const uint8_t *tab, int len,
     if (source) {
       if (b) {
         line1 = find_line_num(ctx, b, pos) - line_num + 1;
-      } else if (op == OP_line_num) {
-        line1 = get_u32(tab + pos + 1) - line_num + 1;
+      } else if (op == OP_loc) {
+        line1 = get_u64(tab + pos + 1) - line_num + 1;
       }
       if (line1 > line) {
         if (!in_source)
@@ -476,14 +476,9 @@ void dump_byte_code(JSContext *ctx, int pass, const uint8_t *tab, int len,
       printf(" %u", get_u32(tab + pos));
       break;
     case OP_FMT_u64:
-      if (op == OP_col_num) {
-        uint64_t lc = get_u64(tab + pos);
-        int line_num = LINECOL_LINE(lc);
-        if (line_num) {
-          printf(" %u:%u", line_num, LINECOL_COL(lc));
-        } else {
-          printf(" %u", LINECOL_COL(lc));
-        }
+      if (op == OP_loc) {
+        uint64_t loc = get_u64(tab + pos);
+        printf(" %u:%u", LOC_LINE(loc), LOC_COL(loc));
       } else {
         printf(" %llu", get_u64(tab + pos));
       }

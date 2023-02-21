@@ -5,7 +5,7 @@
 __exception int js_parse_array_literal(JSParseState *s) {
   uint32_t idx;
   BOOL need_length;
-  int col_num = s->token.col_num;
+  uint64_t loc = LOC(s->token.line_num, s->token.col_num);
 
   if (next_token(s))
     return -1;
@@ -24,7 +24,7 @@ __exception int js_parse_array_literal(JSParseState *s) {
     } else if (s->token.val != ']')
       goto done;
   }
-  s->col_num2emit = col_num;
+  s->loc = loc;
   emit_op(s, OP_array_from);
   emit_u16(s, idx);
 

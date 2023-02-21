@@ -8,6 +8,7 @@
 #include "vm/instr.h"
 #include "vm/mod.h"
 #include "vm/str.h"
+#include <stdint.h>
 
 enum {
   TOK_NUMBER = -128,
@@ -192,11 +193,11 @@ typedef struct LabelSlot {
   RelocEntry *first_reloc;
 } LabelSlot;
 
-typedef struct LineNumberSlot {
+typedef struct LocSlot {
   uint32_t pc;
   int line_num;
   int col_num;
-} LineNumberSlot;
+} LocSlot;
 
 typedef enum JSParseFunctionEnum {
   JS_PARSE_FUNC_STATEMENT,
@@ -290,9 +291,7 @@ typedef struct JSFunctionDef {
   JSGlobalVar *global_vars;
 
   DynBuf byte_code;
-  int last_opcode_pos; /* -1 if no last opcode */
-  int last_opcode_line_num;
-  int last_opcode_col_num;
+  int last_opcode_pos;    /* -1 if no last opcode */
   BOOL use_short_opcodes; /* true if short opcodes are used in byte_code */
 
   LabelSlot *label_slots;
@@ -314,16 +313,15 @@ typedef struct JSFunctionDef {
   int jump_size;
   int jump_count;
 
-  LineNumberSlot *line_number_slots;
-  int line_number_size;
-  int line_number_count;
-  int line_number_last;
-  int col_number_last;
-  int line_number_last_pc;
+  LocSlot *loc_slots;
+  int loc_size;
+  int loc_count;
+  uint64_t loc_last;
+  int loc_last_pc;
 
   /* pc2line table */
   JSAtom filename;
-  int line_num;
+  int line_num; /* base line for all the lines in pc2line table */
   DynBuf pc2line;
 
   char *source; /* raw source, utf-8 encoded */
@@ -332,21 +330,19 @@ typedef struct JSFunctionDef {
   JSModuleDef *module; /* != NULL when parsing a module */
 } JSFunctionDef;
 
-#define LINECOL(line_num, col_num) ((uint64_t)line_num << 32 | col_num)
-#define LINECOL_LINE(lc) ((int)(lc >> 32))
-#define LINECOL_COL(lc) ((int)lc)
+#define LOC(line_num, col_num) ((uint64_t)line_num << 32 | col_num)
+#define LOC_LINE(lc) ((int)(lc >> 32))
+#define LOC_COL(lc) ((int)lc)
 
 typedef struct JSParseState {
   JSContext *ctx;
   int last_line_num; /* line number of last token */
   int line_num;      /* line number of current offset, starts from 1 */
   int col_num;       /* column number of current offset , starts from 1 */
-  // column number to emit in bytecode stream, `0` to skip emitting, use
-  // `uint64_t` as its size since we will encode line in it when bytecode and
-  // its source are in different lines, a typical case is the forin-loop, the
-  // `cont-part` is on the top while its bytecode(`for_in_next`) is on the
-  // bottom
-  uint64_t col_num2emit;
+  /* LoC to emit to the bytecode stream, `0` to skip emitting, use
+    `uint64_t` as its size since we will encode line_num an col_num in it in a
+     form of `line_num:col_num` */
+  uint64_t loc;
   const char *filename;
   JSToken token;
   BOOL got_lf; /* true if got line feed before the current token */
@@ -759,7 +755,7 @@ typedef struct CodeContext {
   const uint8_t *bc_buf; /* code buffer */
   int bc_len;            /* length of the code buffer */
   int pos;               /* position past the matched code pattern */
-  int line_num;          /* last visited OP_line_num parameter or -1 */
+  uint64_t loc;          /* last visited OP_loc parameter or 0 */
   int op;
   int idx;
   int label;
@@ -775,6 +771,6 @@ typedef struct CodeContext {
 BOOL code_match(CodeContext *s, int pos, ...);
 
 int skip_dead_code(JSFunctionDef *s, const uint8_t *bc_buf, int bc_len, int pos,
-                   int *linep);
+                   uint64_t *locp);
 
 #endif

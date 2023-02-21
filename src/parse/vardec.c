@@ -198,7 +198,7 @@ int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
   JSAtom prop_name, var_name;
   int opcode, scope, tok1, skip_bits;
   BOOL has_initializer;
-  uint64_t col_num = 0;
+  uint64_t loc = 0;
 
   if (has_ellipsis < 0) {
     /* pre-parse destruction target for spread detection */
@@ -228,7 +228,7 @@ int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
     if (next_token(s))
       return -1;
     // save the col_num of the prop(maybe)
-    col_num = s->token.col_num;
+    loc = LOC(s->token.line_num, s->token.col_num);
     /* throw an exception if the value cannot be converted to an object */
     emit_op(s, OP_to_object);
     if (has_ellipsis) {
@@ -246,7 +246,7 @@ int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
         if (next_token(s)) // consume `...`
           return -1;
         // save the col_num of the prop
-        col_num = s->token.col_num;
+        loc = LOC(s->token.line_num, s->token.col_num);
         if (tok) {
           var_name = js_parse_destructuring_var(s, tok, is_arg);
           if (var_name == JS_ATOM_NULL)
@@ -284,7 +284,7 @@ int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
         if (next_token(s)) // consume `:`
           goto prop_error;
 
-        col_num = s->token.col_num;
+        loc = LOC(s->token.line_num, s->token.col_num);
 
         // `PROP_TYPE_IDENT` forms `prop:` if there is either `[` or `{`
         // next to it, then the following maybe the nested destruction
@@ -460,7 +460,7 @@ int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
         emit_label(s, label_hasval);
       }
       /* store value into lvalue object */
-      s->col_num2emit = col_num;
+      s->loc = loc;
       put_lvalue(s, opcode, scope, var_name, label_lvalue,
                  PUT_LVALUE_NOKEEP_DEPTH, (tok == TOK_CONST || tok == TOK_LET));
       if (s->token.val == '}')
@@ -490,12 +490,12 @@ int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
     emit_op(s, OP_for_of_start);
     has_spread = FALSE;
     while (s->token.val != ']') {
-      col_num = s->token.col_num;
+      loc = LOC(s->token.line_num, s->token.col_num);
       /* get the next value */
       if (s->token.val == TOK_ELLIPSIS) {
         if (next_token(s)) // consume `...`
           return -1;
-        col_num = s->token.col_num;
+        loc = LOC(s->token.line_num, s->token.col_num);
         if (s->token.val == ',' || s->token.val == ']')
           return js_parse_error(s, "missing binding pattern...");
         has_spread = TRUE;
@@ -566,7 +566,7 @@ int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
           emit_label(s, label_hasval);
         }
         /* store value into lvalue object */
-        s->col_num2emit = col_num;
+        s->loc = loc;
         put_lvalue(s, opcode, scope, var_name, label_lvalue,
                    PUT_LVALUE_NOKEEP_DEPTH,
                    (tok == TOK_CONST || tok == TOK_LET));
@@ -665,13 +665,13 @@ __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
   JSContext *ctx = s->ctx;
   JSFunctionDef *fd = s->cur_func;
   JSAtom name = JS_ATOM_NULL;
-  uint64_t col_num = 0;
+  uint64_t loc = 0;
 
   for (;;) {
     if (s->token.val == TOK_IDENT) {
-      // save col_num of ident, use it as the value of OP_col_num if
+      // save col_num of ident, use it as the value of OP_loc if
       // there is no init part of vardec
-      col_num = s->token.col_num;
+      loc = LOC(s->token.line_num, s->token.col_num);
 
       if (s->token.u.ident.is_reserved) {
         return js_parse_error_reserved_identifier(s);
@@ -695,7 +695,7 @@ __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
         if (next_token(s))
           goto var_error;
 
-        col_num = s->token.col_num;
+        loc = LOC(s->token.line_num, s->token.col_num);
         if (tok == TOK_VAR) {
           /* Must make a reference for proper `with` semantics */
           int opcode, scope, label;
@@ -712,13 +712,13 @@ __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
             goto var_error;
           }
           set_object_name(s, name);
-          s->col_num2emit = col_num;
+          s->loc = loc;
           put_lvalue(s, opcode, scope, name1, label, PUT_LVALUE_NOKEEP, FALSE);
         } else {
           if (js_parse_assign_expr2(s, parse_flags))
             goto var_error;
           set_object_name(s, name);
-          s->col_num2emit = col_num;
+          s->loc = loc;
           emit_op(s, (tok == TOK_CONST || tok == TOK_LET)
                          ? OP_scope_put_var_init
                          : OP_scope_put_var);
@@ -733,12 +733,12 @@ __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
         if (tok == TOK_LET) {
           /* initialize lexical variable upon entering its scope */
           emit_op(s, OP_undefined);
-          s->col_num2emit = col_num;
+          s->loc = loc;
           emit_op(s, OP_scope_put_var_init);
           emit_atom(s, name);
           emit_u16(s, fd->scope_level);
         }
-        // there is no OP_col_num for the var defined without init part:
+        // there is no `OP_loc` for the var defined without init part:
         //
         // ```
         // var f;

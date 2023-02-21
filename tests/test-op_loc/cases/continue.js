@@ -7,7 +7,6 @@ outer: while (a > 1) {
 }
 
 /* EXPECT(outer):
-        line_num 5
-        col_num 5
-        goto 1:55
+        loc 5:5
+        goto 1:40
 */

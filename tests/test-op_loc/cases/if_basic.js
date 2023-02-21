@@ -8,14 +8,14 @@ if (print(a)) {
 /* EXPECT(print(a)):
         get_var print
         get_var a
-        col_num 5
+        loc 3:10
+        call 1
 */
 
 /* EXPECT(print(2)):
-        line_num 5
-        col_num 3
+        loc 5:3
         get_var print
         push_i32 2
-        col_num 3
+        loc 5:8
         call 1
 */
