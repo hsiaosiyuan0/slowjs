@@ -1188,6 +1188,7 @@ JSFunctionDef *js_new_function_def(JSContext *ctx, JSFunctionDef *parent,
   // fd->pc2line_last_line_num = line_num;
   // fd->pc2line_last_pc = 0;
   fd->last_opcode_line_num = line_num;
+  fd->col_number_last = -1;
 
   return fd;
 }
@@ -1364,7 +1365,8 @@ JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd) {
   // phase2:
   // 1. remove `nop`
   // 2. process the bytecode which used to manipulate the variables, eg:
-  //    - according `enter_scope` and `leave_scope` to do the variable resolution
+  //    - according `enter_scope` and `leave_scope` to do the variable
+  //    resolution
   //      and remove them out from the bytecode stream flows to the next phase
   //    - turn `scope_get_var` to the actual bytecode
   if (resolve_variables(ctx, fd))

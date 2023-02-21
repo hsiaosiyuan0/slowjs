@@ -1555,11 +1555,11 @@ fail:
 static void add_pc2line_info(JSFunctionDef *s, uint32_t pc, int line_num,
                              int col_num) {
   BOOL line_changed = FALSE, col_changed = FALSE;
+  line_changed = line_num != s->line_number_last;
   if (s->line_number_slots != NULL &&
       s->line_number_count < s->line_number_size &&
-      pc >= s->line_number_last_pc &&
-      ((line_changed = (line_num != s->line_number_last)) ||
-       (line_num != 0 && (col_changed = (col_num > s->col_number_last))))) {
+      pc >= s->line_number_last_pc && line_num != 0 &&
+      (col_changed = col_num != s->col_number_last)) {
     s->line_number_slots[s->line_number_count].pc = pc;
     s->line_number_slots[s->line_number_count].line_num = line_num;
     s->line_number_slots[s->line_number_count].col_num = col_num;
@@ -1567,9 +1567,8 @@ static void add_pc2line_info(JSFunctionDef *s, uint32_t pc, int line_num,
     s->line_number_last_pc = pc;
     if (line_changed) {
       s->line_number_last = line_num;
-      s->col_number_last = 0;
-    }
-    if (col_changed)
+      s->col_number_last = -1;
+    } else if (col_changed)
       s->col_number_last = col_num;
   }
 }
@@ -1592,7 +1591,7 @@ static void compute_pc2line_info(JSFunctionDef *s) {
 
       diff_pc = pc - last_pc;
       diff_line = line_num - last_line_num;
-      if (diff_line == 0 || diff_pc < 0)
+      if (diff_pc < 0)
         continue;
 
       if (diff_line >= PC2LINE_BASE &&
@@ -1735,7 +1734,6 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
     if (s->line_number_slots == NULL)
       return -1;
     s->line_number_last = s->line_num;
-    s->col_number_last = 0;
     s->line_number_last_pc = 0;
   }
 
@@ -1866,7 +1864,8 @@ __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s) {
       if (code_match(&cc, pos_next, OP_return, -1)) {
         if (cc.line_num >= 0)
           line_num = cc.line_num;
-        add_pc2line_info(s, bc_out.size, line_num, 0);
+        RESOLVE_LINECOL(0);
+        add_pc2line_info(s, bc_out.size, line_num, col_num);
         put_short_code(&bc_out, op + 1, argc);
         pos_next = skip_dead_code(s, bc_buf, bc_len, cc.pos, &line_num);
         break;

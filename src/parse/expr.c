@@ -1130,7 +1130,7 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
         if (has_optional_chain) {
           optional_chain_test(s, &optional_chaining_label, 1);
         }
-        s->col_num2emit = col_num;
+        s->col_num2emit = LINECOL(s->token.line_num, col_num);
         emit_op(s, OP_scope_get_private_field);
         emit_atom(s, s->token.u.ident.atom);
         emit_u16(s, s->cur_func->scope_level);
@@ -1151,7 +1151,7 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
           if (has_optional_chain) {
             optional_chain_test(s, &optional_chaining_label, 1);
           }
-          s->col_num2emit = col_num;
+          s->col_num2emit = LINECOL(s->token.line_num, col_num);
           emit_op(s, OP_get_field);
           emit_atom(s, s->token.u.ident.atom);
         }
