@@ -7,7 +7,7 @@
 
 JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
                          JSValueConst *argv) {
-  JSValue pc2lineArr, pc2line;
+  JSValue pc2lineArr, pc2line, ret;
 
   uint8_t *buf = NULL, *buf_pos = NULL;
   const uint8_t *buf_end = NULL;
@@ -87,5 +87,13 @@ JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
     JS_SetPropertyUint32(ctx, pc2lineArr, i++, pc2line);
   }
 
-  return pc2lineArr;
+  ret = JS_NewObject(ctx);
+  if (JS_IsException(ret))
+    return JS_EXCEPTION;
+
+  JS_SetPropertyStr(ctx, ret, "file", JS_AtomToString(ctx, b->debug.filename));
+  JS_SetPropertyStr(ctx, ret, "line", JS_NewInt32(ctx, b->debug.line_num));
+  JS_SetPropertyStr(ctx, ret, "breakpoints", pc2lineArr);
+
+  return ret;
 }

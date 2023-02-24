@@ -23,5 +23,5 @@
 
 /vcpkg_installed
 vcpkg-manifest-install.log
-/test.js
-/test.log
+/tmp_test_*
+/tmp_test_*.log

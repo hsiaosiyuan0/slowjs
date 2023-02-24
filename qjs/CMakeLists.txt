@@ -1,4 +1,4 @@
-set(QJS_SOURCES qjs.c "${CMAKE_CURRENT_SOURCE_DIR}/repl.c")
+set(QJS_SOURCES qjs.c debug.c "${CMAKE_CURRENT_SOURCE_DIR}/repl.c")
 
 add_executable(qjs ${QJS_SOURCES})
 target_link_libraries(qjs quickjs)

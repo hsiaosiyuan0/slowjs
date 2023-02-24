@@ -8,7 +8,6 @@
 #include "vm/instr.h"
 #include "vm/mod.h"
 #include "vm/str.h"
-#include <stdint.h>
 
 enum {
   TOK_NUMBER = -128,

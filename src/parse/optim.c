@@ -4,7 +4,6 @@
 #include "utils/dbuf.h"
 #include "vm/error.h"
 #include "vm/vm.h"
-#include <stdint.h>
 
 /* 'op' is only used for error indication */
 static __exception int ss_check(JSContext *ctx, StackSizeState *s, int pos,

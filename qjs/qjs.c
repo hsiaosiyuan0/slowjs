@@ -294,6 +294,7 @@ void help(void) {
 #endif
       "-T  --trace        trace memory allocation\n"
       "-d  --dump         dump the memory usage stats\n"
+      "    --debug n      start a debugger at port 'n'\n"
       "    --memory-limit n       limit the memory usage to 'n' bytes\n"
       "    --stack-size n         limit the stack size to 'n' bytes\n"
       "    --unhandled-rejection  dump unhandled promise rejections\n"
@@ -301,9 +302,8 @@ void help(void) {
   exit(1);
 }
 
-// #ifdef __cplusplus
-// extern "C" int main(int argc, char **argv);
-// #endif
+void serve_debug(uint64_t port);
+
 int main(int argc, char **argv) {
   JSRuntime *rt;
   JSContext *ctx;
@@ -318,6 +318,7 @@ int main(int argc, char **argv) {
   int load_std = 0;
   int dump_unhandled_promise_rejection = 0;
   size_t memory_limit = 0;
+  int debug_port = 0;
   char *include_list[32];
   int i, include_count = 0;
 #ifdef CONFIG_BIGNUM
@@ -376,11 +377,11 @@ int main(int argc, char **argv) {
       }
       if (opt == 'I' || !strcmp(longopt, "include")) {
         if (optind >= argc) {
-          fprintf(stderr, "expecting filename");
+          fprintf(stderr, "expecting filename\n");
           exit(1);
         }
         if (include_count >= countof(include_list)) {
-          fprintf(stderr, "too many included files");
+          fprintf(stderr, "too many included files\n");
           exit(1);
         }
         include_list[include_count++] = argv[optind++];
@@ -398,7 +399,8 @@ int main(int argc, char **argv) {
         module = 0;
         continue;
       }
-      if (opt == 'd' || !strcmp(longopt, "dump")) {
+      if ((opt == 'd' || !strcmp(longopt, "dump")) &&
+          strcmp(longopt, "debug")) {
         dump_memory++;
         continue;
       }
@@ -430,15 +432,27 @@ int main(int argc, char **argv) {
       }
       if (!strcmp(longopt, "memory-limit")) {
         if (optind >= argc) {
-          fprintf(stderr, "expecting memory limit");
+          fprintf(stderr, "expecting memory limit\n");
           exit(1);
         }
         memory_limit = (size_t)strtod(argv[optind++], NULL);
         continue;
       }
+      if (!strcmp(longopt, "debug")) {
+        if (optind >= argc) {
+          fprintf(stderr, "expecting a port to debug\n");
+          exit(1);
+        }
+        debug_port = atoi(argv[optind++]);
+        if (!debug_port) {
+          fprintf(stderr, "expecting a valid port to debug\n");
+          exit(1);
+        }
+        continue;
+      }
       if (!strcmp(longopt, "stack-size")) {
         if (optind >= argc) {
-          fprintf(stderr, "expecting stack size");
+          fprintf(stderr, "expecting stack size\n");
           exit(1);
         }
         stack_size = (size_t)strtod(argv[optind++], NULL);
@@ -457,6 +471,11 @@ int main(int argc, char **argv) {
   if (load_jscalc)
     bignum_ext = 1;
 #endif
+
+  if (debug_port) {
+    serve_debug(debug_port);
+    return 0;
+  }
 
   if (trace_memory) {
     js_trace_malloc_init(&trace_data);

@@ -47,6 +47,7 @@
     "DYNBUF",
     "ediv",
     "edivrem",
+    "efds",
     "enumobj",
     "EUCLIDIAN",
     "exename",
@@ -128,6 +129,7 @@
     "qjscalc",
     "QUICKJS",
     "RADPNT",
+    "rfds",
     "RNDA",
     "RNDD",
     "RNDF",
@@ -163,6 +165,7 @@
     "vcpkg",
     "WEAKMAP",
     "WEAKSET",
+    "wfds",
     "xglue",
     "xorshift"
   ]
