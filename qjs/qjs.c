@@ -50,8 +50,8 @@ extern const uint32_t qjsc_qjscalc_size;
 static int bignum_ext;
 #endif
 
-static int eval_buf(JSContext *ctx, const char *buf, int buf_len,
-                    const char *filename, int eval_flags) {
+int eval_buf(JSContext *ctx, const char *buf, int buf_len, const char *filename,
+             int eval_flags) {
   JSValue val;
   int ret;
 
@@ -102,7 +102,7 @@ static int eval_file(JSContext *ctx, const char *filename, int module) {
 }
 
 /* also used to initialize the worker context */
-static JSContext *JS_NewCustomContext(JSRuntime *rt) {
+JSContext *JS_NewCustomContext(JSRuntime *rt) {
   JSContext *ctx;
   ctx = JS_NewContext(rt);
   if (!ctx)

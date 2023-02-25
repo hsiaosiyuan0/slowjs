@@ -1,5 +1,7 @@
 #include "include/quickjs-libc.h"
+#include "include/quickjs.h"
 #include "libs/cutils.h"
+#include "libs/libregexp.h"
 #include "libs/list.h"
 #include <arpa/inet.h>
 #include <errno.h>
@@ -58,8 +60,30 @@ typedef struct sess_t {
   serv_t *serv;
   pthread_t theadId;
 
+  JSRuntime *rt;
+  JSContext *ctx;
+
   BOOL invalid;
 } sess_t;
+
+JSContext *JS_NewCustomContext(JSRuntime *rt);
+int eval_file(JSContext *ctx, const char *filename, int module);
+
+void rt_setup(JSRuntime **rtp, JSContext **ctxp) {
+  *rtp = JS_NewRuntime();
+
+  js_std_set_worker_new_context_func(JS_NewCustomContext);
+  js_std_init_handlers(*rtp);
+
+  *ctxp = JS_NewCustomContext(*rtp);
+
+  /* loader for ES6 modules */
+  JS_SetModuleLoaderFunc(*rtp, NULL, js_module_loader, NULL);
+  JS_SetHostPromiseRejectionTracker(*rtp, js_std_promise_rejection_tracker,
+                                    NULL);
+
+  js_std_add_helpers(*ctxp, -1, NULL);
+}
 
 sess_t *new_sess() {
   sess_t *sess = calloc(1, sizeof(sess_t));
@@ -73,6 +97,7 @@ sess_t *new_sess() {
 
   pthread_mutex_init(&sess->out_msgs_lock, NULL);
   init_list_head(&sess->out_msgs);
+
   return sess;
 }
 
@@ -100,6 +125,10 @@ void free_sess(sess_t *sess) {
   }
   pthread_mutex_unlock(&sess->out_msgs_lock);
   pthread_mutex_destroy(&sess->out_msgs_lock);
+
+  js_std_free_handlers(sess->rt);
+  JS_FreeContext(sess->ctx);
+  JS_FreeRuntime(sess->rt);
 
   free(sess);
 }
@@ -134,8 +163,8 @@ int sess_enqueue_in_msg(sess_t *sess) {
       return -1;
     }
 
-    if (len == 0)
-      return 0;
+    if (len == 0) // conn closed
+      return -1;
 
     if (dbuf_put(&msg->buf, buf, len))
       return -1;
@@ -209,8 +238,6 @@ serv_t *new_serv(uint64_t port) {
 }
 
 sess_t *accept_conn(serv_t *serv) {
-  int flags;
-
   sess_t *sess = new_sess();
   if (!sess)
     fatal("failed to make sess\n");
@@ -230,34 +257,107 @@ void serv_free_sess(serv_t *serv, sess_t *sess) {
   free_sess(sess);
 }
 
-void *sess_thread_handler(void *arg) {
-  sess_t *sess = arg;
-  struct list_head *el, *el1;
+// `replay` will be freed
+int sess_event_send_replay(sess_t *sess, JSValue replay) {
+  JSValue str;
+  const char *cstr;
+  size_t len;
   msg_t *msg;
-  int len;
 
-  printf("sess thread is running...\n");
+  str = JS_JSONStringify(sess->ctx, replay, JS_NULL, JS_NewInt32(sess->ctx, 2));
+  if (JS_IsException(str))
+    return -1;
+
+  cstr = JS_ToCStringLen(sess->ctx, &len, str);
+  if (!cstr)
+    return -1;
+
+  msg = new_msg();
+  dbuf_put(&msg->buf, (uint8_t *)cstr, strlen(cstr));
+
+  JS_FreeCString(sess->ctx, cstr);
+  JS_FreeValue(sess->ctx, str);
+  JS_FreeValue(sess->ctx, replay);
+
+  sess_enqueue_out_msg(sess, msg);
+  return 0;
+}
+
+void sess_event_handle(sess_t *sess, JSValue event) {
+  sess_event_send_replay(sess, event);
+}
+
+JSValue new_event_err(sess_t *sess, int code, const char *msg) {
+  JSValue obj;
+  obj = JS_NewObject(sess->ctx);
+  if (JS_IsException(obj)) {
+    sess->invalid = TRUE;
+    printf("failed to new event error, stopping...\n");
+    return JS_EXCEPTION;
+  }
+  JS_SetPropertyStr(sess->ctx, obj, "code", JS_NewInt32(sess->ctx, code));
+  if (msg) {
+    JS_SetPropertyStr(sess->ctx, obj, "msg",
+                      JS_NewStringLen(sess->ctx, msg, strlen(msg)));
+  }
+  return obj;
+}
+
+void msg_trim_end(msg_t *msg) {
+  while (msg->buf.size) {
+    if (lre_is_space(msg->buf.buf[msg->buf.size - 1])) {
+      msg->buf.size -= 1;
+    } else {
+      break;
+    }
+  }
+}
+
+void *sess_handler(void *arg) {
+  sess_t *sess = arg;
+  msg_t *msg;
+  JSValue event, err;
+
+  printf("new sess thread is running...\n");
   sess->invalid = FALSE;
+
+  // setup rt in thread
+  rt_setup(&sess->rt, &sess->ctx);
 
   pthread_mutex_lock(&sess->in_msgs_lock);
   while (1) {
     if (sess->invalid) {
       pthread_mutex_unlock(&sess->in_msgs_lock);
+      printf("sess thread runs into invalid, stopping...\n");
       break;
     }
 
     msg = sess_dequeue_in_msg(sess);
     if (msg) {
-      sess_enqueue_out_msg(sess, msg);
+      msg_trim_end(msg);
+      dbuf_putc(&msg->buf, 0);
+      event = JS_ParseJSON(sess->ctx, (char *)msg->buf.buf, msg->buf.size - 1,
+                           "<input>");
+      if (JS_IsException(event)) {
+        err = new_event_err(sess, 500, "deformed request");
+        if (JS_IsException(err))
+          return NULL;
+
+        sess_event_send_replay(sess, err);
+        continue;
+      }
+
+      sess_event_handle(sess, event);
       continue;
     }
     pthread_cond_wait(&sess->wakeup, &sess->in_msgs_lock);
   }
+  pthread_mutex_unlock(&sess->in_msgs_lock);
   return NULL;
 }
 
 void sess_start(sess_t *sess) {
-  int s = pthread_create(&sess->theadId, NULL, &sess_thread_handler, sess);
+  int s = pthread_create(&sess->theadId, NULL, &sess_handler, sess);
   if (s)
     fatal("failed to start sess\n");
 }
@@ -324,6 +424,9 @@ void serve_debug(uint64_t port) {
         if (FD_ISSET(sess->conn.fd, &rfds1)) {
           if (sess_enqueue_in_msg(sess)) {
             printf("failed to read msg: %s\n", strerror(errno));
+            FD_CLR(sess->conn.fd, &rfds);
+            if (sess->conn.fd == max_fd)
+              max_fd -= 1;
             sess->invalid = TRUE;
           }
         }
@@ -334,6 +437,9 @@ void serve_debug(uint64_t port) {
             len = send(sess->conn.fd, msg->buf.buf, msg->buf.size, 0);
             if (len < 0) {
               printf("failed to send msg: %s\n", strerror(errno));
+              FD_CLR(sess->conn.fd, &wfds);
+              if (sess->conn.fd == max_fd)
+                max_fd -= 1;
               sess->invalid = TRUE;
             }
           }
