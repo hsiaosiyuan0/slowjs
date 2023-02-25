@@ -18,6 +18,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#ifndef FD_COPY
+#define FD_COPY(dest, src) memcpy((dest), (src), sizeof *(dest))
+#endif
+
 typedef struct msg_t {
   struct list_head link;
   DynBuf buf;
