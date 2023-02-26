@@ -77,7 +77,7 @@ int eval_buf(JSContext *ctx, const char *buf, int buf_len, const char *filename,
   return ret;
 }
 
-static int eval_file(JSContext *ctx, const char *filename, int module) {
+int eval_file(JSContext *ctx, const char *filename, int module) {
   uint8_t *buf;
   int ret, eval_flags;
   size_t buf_len;

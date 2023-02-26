@@ -1085,6 +1085,12 @@ int JS_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
 int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
                            const JSCFunctionListEntry *tab, int len);
 
+/* Debugger */
+
+void js_debug_init(JSContext *ctx);
+void js_debug_pause(JSContext *ctx);
+void js_debug_continue(JSContext *ctx);
+
 #undef js_unlikely
 #undef js_force_inline
 

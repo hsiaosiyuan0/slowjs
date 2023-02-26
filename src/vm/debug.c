@@ -1,5 +1,4 @@
 #include "debug.h"
-#include "include/quickjs.h"
 #include "utils/dbuf.h"
 #include "vm/func.h"
 #include "vm/instr.h"
@@ -97,3 +96,25 @@ JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
 
   return ret;
 }
+
+static inline int js_debug(JSRuntime *rt, void *opaque) {
+  JSContext *ctx = opaque;
+  if (ctx->debug.pause) {
+    pthread_mutex_lock(&ctx->debug.bp_mutex);
+    printf("paused\n");
+    pthread_cond_wait(&ctx->debug.bp_cond, &ctx->debug.bp_mutex);
+  }
+  return 0;
+}
+
+void js_debug_continue(JSContext *ctx) {
+  pthread_cond_signal(&ctx->debug.bp_cond);
+}
+
+void js_debug_init(JSContext *ctx) {
+  pthread_mutex_init(&ctx->debug.bp_mutex, NULL);
+  pthread_cond_init(&ctx->debug.bp_cond, NULL);
+  JS_SetInterruptHandler(ctx->rt, &js_debug, ctx);
+}
+
+void js_debug_pause(JSContext *ctx) { ctx->debug.pause = TRUE; }

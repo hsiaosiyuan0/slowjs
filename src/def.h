@@ -231,7 +231,7 @@ typedef struct JSVarRef {
 
       /* 0 : the JSVarRef is on the stack. header.link is an element
          of JSStackFrame.var_ref_list.
-         1 : the JSVarRef is detached. header.link has the normal meanning
+         1 : the JSVarRef is detached. header.link has the normal meaning
       */
       uint8_t is_detached : 1;
       uint8_t is_arg : 1;
@@ -298,6 +298,13 @@ struct JSContext {
   JSValue (*eval_internal)(JSContext *ctx, JSValueConst this_obj,
                            const char *input, size_t input_len,
                            const char *filename, int flags, int scope_idx);
+
+  struct {
+    pthread_mutex_t bp_mutex;
+    pthread_cond_t bp_cond;
+    BOOL pause;
+  } debug;
+
   void *user_opaque;
 };
 

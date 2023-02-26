@@ -44,6 +44,8 @@ void free_msg(msg_t *msg) {
 
 typedef struct serv_t serv_t;
 
+//        1:1             1:1                   1:1
+// conn -------> sess_t -------> event thread -------> user script thread
 typedef struct sess_t {
   struct list_head link;
 
@@ -62,12 +64,22 @@ typedef struct sess_t {
   struct list_head out_msgs; /* msg_t list */
 
   serv_t *serv;
-  pthread_t theadId;
+  pthread_t thead_id;
 
+  // rt/ctx for encode/decode client messages
   JSRuntime *rt;
   JSContext *ctx;
 
+  // rt/ctx for eval the requested script
+  JSRuntime *eval_rt;
+  JSContext *eval_ctx;
+  JSValue eval_file;
+  pthread_t eval_thread_id;
+  int eval_retval; // -2: running, -1: error, 0: ok:
+  char *eval_errmsg;
+
   BOOL invalid;
+  BOOL closing;
 } sess_t;
 
 JSContext *JS_NewCustomContext(JSRuntime *rt);
@@ -167,8 +179,11 @@ int sess_enqueue_in_msg(sess_t *sess) {
       return -1;
     }
 
-    if (len == 0) // conn closed
+    // conn closed
+    if (len == 0) {
+      sess->closing = TRUE;
       return -1;
+    }
 
     if (dbuf_put(&msg->buf, buf, len))
       return -1;
@@ -287,10 +302,6 @@ int sess_event_send_replay(sess_t *sess, JSValue replay) {
   return 0;
 }
 
-void sess_event_handle(sess_t *sess, JSValue event) {
-  sess_event_send_replay(sess, event);
-}
-
 JSValue new_event_err(sess_t *sess, int code, const char *msg) {
   JSValue obj;
   obj = JS_NewObject(sess->ctx);
@@ -305,6 +316,135 @@ JSValue new_event_err(sess_t *sess, int code, const char *msg) {
                       JS_NewStringLen(sess->ctx, msg, strlen(msg)));
   }
   return obj;
+}
+
+JSValue new_event_replay(sess_t *sess, JSValue data) {
+  JSValue obj;
+  obj = JS_NewObject(sess->ctx);
+  if (JS_IsException(obj)) {
+    sess->invalid = TRUE;
+    printf("failed to new event error, stopping...\n");
+    return JS_EXCEPTION;
+  }
+  JS_SetPropertyStr(sess->ctx, obj, "code", JS_NewInt32(sess->ctx, 200));
+  JS_SetPropertyStr(sess->ctx, obj, "data", data);
+  return obj;
+}
+
+void *debug_user_script(void *arg) {
+  sess_t *sess = arg;
+
+  // TODO: raise exception if `rt` is failed to setup
+  rt_setup(&sess->eval_rt, &sess->eval_ctx);
+
+  const char *filename_cstr = JS_ToCString(sess->eval_ctx, sess->eval_file);
+  if (!filename_cstr) {
+    sess->eval_errmsg = "deformed filename";
+    goto fail;
+  }
+
+  js_debug_init(sess->eval_ctx);
+  js_debug_pause(sess->eval_ctx);
+  if (eval_file(sess->eval_ctx, filename_cstr, 1)) {
+    sess->eval_errmsg = "failed to eval user script";
+    goto fail;
+  }
+
+  goto succ;
+
+done:
+  JS_FreeValue(sess->ctx, sess->eval_file);
+  JS_FreeCString(sess->eval_ctx, filename_cstr);
+  JS_FreeContext(sess->eval_ctx);
+  JS_FreeRuntime(sess->eval_rt);
+
+  sess->eval_ctx = NULL;
+  sess->eval_rt = NULL;
+  return NULL;
+
+succ:
+  sess->eval_retval = 0;
+  goto done;
+
+fail:
+  sess->eval_retval = -1;
+  goto done;
+}
+
+void sess_event_handle(sess_t *sess, JSValue event) {
+  JSValue act = JS_NULL, args = JS_NULL;
+  const char *act_cstr;
+  size_t act_len;
+  int err_code = 500;
+  const char *err_msg = "deformed request";
+
+  act = JS_GetPropertyStr(sess->ctx, event, "type");
+  act_cstr = JS_ToCString(sess->ctx, act);
+  if (!act_cstr)
+    goto fail;
+
+  args = JS_GetPropertyStr(sess->ctx, event, "data");
+  JS_DeleteProperty(sess->ctx, event, JS_NewAtom(sess->ctx, "data"), 0);
+
+  if (!strcmp("ping", act_cstr)) {
+    JS_SetPropertyStr(sess->ctx, event, "type",
+                      JS_NewString(sess->ctx, "pong"));
+    JS_SetPropertyStr(sess->ctx, event, "data", JS_DupValue(sess->ctx, args));
+    goto succ;
+  }
+
+  if (!strcmp("run", act_cstr)) {
+    if (sess->eval_retval == -2) {
+      err_msg = "previous script is still running";
+      goto fail;
+    }
+
+    sess->eval_retval = -2;
+
+    if (!JS_IsObject(args))
+      goto fail;
+
+    sess->eval_file = JS_GetPropertyStr(sess->ctx, args, "file");
+    if (!JS_IsString(sess->eval_file)) {
+      JS_FreeValue(sess->ctx, sess->eval_file);
+      goto fail;
+    }
+
+    int s =
+        pthread_create(&sess->eval_thread_id, NULL, &debug_user_script, sess);
+    if (s) {
+      err_msg = "failed to eval user script";
+      goto fail;
+    }
+
+    goto succ;
+  }
+
+  if (!strcmp("continue", act_cstr)) {
+    if (sess->eval_retval != -2 || sess->eval_ctx == NULL) {
+      err_msg = "user script is not running";
+      goto fail;
+    }
+
+    js_debug_continue(sess->eval_ctx);
+    goto succ;
+  }
+
+  goto fail;
+
+done:
+  JS_FreeValue(sess->ctx, args);
+  JS_FreeCString(sess->ctx, act_cstr);
+  JS_FreeValue(sess->ctx, act);
+  return;
+
+succ:
+  sess_event_send_replay(sess, event);
+  goto done;
+
+fail:
+  sess_event_send_replay(sess, new_event_err(sess, err_code, err_msg));
+  goto done;
 }
 
 void msg_trim_end(msg_t *msg) {
@@ -332,7 +472,11 @@ void *sess_handler(void *arg) {
   while (1) {
     if (sess->invalid) {
       pthread_mutex_unlock(&sess->in_msgs_lock);
-      printf("sess thread runs into invalid, stopping...\n");
+      if (sess->closing) {
+        printf("client closed, stopping sess thread...\n");
+      } else {
+        printf("sess thread runs into invalid, stopping...\n");
+      }
       break;
     }
 
@@ -361,7 +505,7 @@ void *sess_handler(void *arg) {
 }
 
 void sess_start(sess_t *sess) {
-  int s = pthread_create(&sess->theadId, NULL, &sess_handler, sess);
+  int s = pthread_create(&sess->thead_id, NULL, &sess_handler, sess);
   if (s)
     fatal("failed to start sess\n");
 }
@@ -419,6 +563,9 @@ void serve_debug(uint64_t port) {
         max_fd = sess->conn.fd;
       }
 
+      // simple thread model - one sess per thread, for complicated situation a
+      // thread pool can be introduced and the numer of threads in that pool can
+      // be set to the number of CPU cores
       sess_start(sess);
     }
 
