@@ -39,6 +39,10 @@ if(QJS_DUMP_BYTECODE)
   target_compile_definitions(quickjs PUBLIC DUMP_BYTECODE=${QJS_DUMP_BYTECODE})
 endif()
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  target_compile_definitions(quickjs PRIVATE DUMP_LEAKS=1)
+endif()
+
 target_compile_options(
   quickjs
   PRIVATE -g

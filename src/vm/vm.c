@@ -9,6 +9,10 @@
 #include "obj.h"
 #include "parse/parse.h"
 
+#ifdef DUMP_LEAKS
+#include "dump.h"
+#endif
+
 /* -- JSContext --------------------------------- */
 
 JSContext *JS_NewContextRaw(JSRuntime *rt) {

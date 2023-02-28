@@ -195,6 +195,8 @@ JSValue js_array_reduce(JSContext *ctx, JSValueConst this_val, int argc,
 
 JSValue js_iterator_proto_iterator(JSContext *ctx, JSValueConst this_val,
                                    int argc, JSValueConst *argv);
+JSValue js_array_sort(JSContext *ctx, JSValueConst this_val, int argc,
+                      JSValueConst *argv);
 
 extern const JSCFunctionListEntry js_iterator_proto_funcs[1];
 extern const JSCFunctionListEntry js_array_proto_funcs[32];
