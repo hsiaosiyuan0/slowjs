@@ -620,6 +620,12 @@ void JS_SetInterruptHandler(JSRuntime *rt, JSInterruptHandler *cb,
   rt->interrupt_opaque = opaque;
 }
 
+void JS_SetPCInterruptHandler(JSRuntime *rt, JSPcInterruptHandler *cb,
+                              void *opaque) {
+  rt->pc_interrupt_handler = cb;
+  rt->pc_interrupt_opaque = opaque;
+}
+
 void JS_SetCanBlock(JSRuntime *rt, BOOL can_block) {
   rt->can_block = can_block;
 }

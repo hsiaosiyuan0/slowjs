@@ -9,7 +9,7 @@
       "request": "launch",
       "name": "Debug",
       "program": "${workspaceFolder}/build/qjs/qjs",
-      "args": ["${workspaceFolder}/tmp_test_2.js"],
+      "args": ["--debug", "8097"],
       "cwd": "${workspaceFolder}"
     }
   ]

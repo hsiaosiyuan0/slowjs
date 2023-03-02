@@ -827,6 +827,10 @@ void JS_SetHostPromiseRejectionTracker(JSRuntime *rt,
 typedef int JSInterruptHandler(JSRuntime *rt, void *opaque);
 void JS_SetInterruptHandler(JSRuntime *rt, JSInterruptHandler *cb,
                             void *opaque);
+
+typedef int JSPcInterruptHandler(const uint8_t *pc, JSRuntime *rt,
+                                 void *opaque);
+
 /* if can_block is TRUE, Atomics.wait() can be used */
 void JS_SetCanBlock(JSRuntime *rt, JS_BOOL can_block);
 /* set the [IsHTMLDDA] internal slot */
@@ -1087,8 +1091,18 @@ int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
 
 /* Debugger */
 
-void js_debug_init(JSContext *ctx);
-void js_debug_pause(JSContext *ctx);
+int js_debug_init(JSContext *ctx);
+void js_debug_wait_ready2start(JSContext *ctx);
+void js_debug_ready2start(JSContext *ctx);
+
+void js_debug_on(JSContext *ctx);
+void js_debug_off(JSContext *ctx);
+void js_free_debug(JSContext *ctx);
+
+int js_debug_set_breakpoint(JSContext *ctx, const char *file, int line,
+                            int col);
+int js_debug_del_breakpoint(JSContext *ctx, const char *file, int line,
+                            int col);
 void js_debug_continue(JSContext *ctx);
 
 #undef js_unlikely

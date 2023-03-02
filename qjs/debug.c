@@ -73,7 +73,7 @@ typedef struct sess_t {
   // rt/ctx for eval the requested script
   JSRuntime *eval_rt;
   JSContext *eval_ctx;
-  JSValue eval_file;
+  const char *eval_file;
   pthread_t eval_thread_id;
   int eval_retval; // -2: running, -1: error, 0: ok:
   char *eval_errmsg;
@@ -142,6 +142,7 @@ void free_sess(sess_t *sess) {
   pthread_mutex_unlock(&sess->out_msgs_lock);
   pthread_mutex_destroy(&sess->out_msgs_lock);
 
+  free((void *)sess->eval_file);
   js_std_free_handlers(sess->rt);
   JS_FreeContext(sess->ctx);
   JS_FreeRuntime(sess->rt);
@@ -318,34 +319,16 @@ JSValue new_event_err(sess_t *sess, int code, const char *msg) {
   return obj;
 }
 
-JSValue new_event_replay(sess_t *sess, JSValue data) {
-  JSValue obj;
-  obj = JS_NewObject(sess->ctx);
-  if (JS_IsException(obj)) {
-    sess->invalid = TRUE;
-    printf("failed to new event error, stopping...\n");
-    return JS_EXCEPTION;
-  }
-  JS_SetPropertyStr(sess->ctx, obj, "code", JS_NewInt32(sess->ctx, 200));
-  JS_SetPropertyStr(sess->ctx, obj, "data", data);
-  return obj;
-}
-
 void *debug_user_script(void *arg) {
   sess_t *sess = arg;
 
-  // TODO: raise exception if `rt` is failed to setup
   rt_setup(&sess->eval_rt, &sess->eval_ctx);
 
-  const char *filename_cstr = JS_ToCString(sess->eval_ctx, sess->eval_file);
-  if (!filename_cstr) {
-    sess->eval_errmsg = "deformed filename";
+  if (js_debug_init(sess->eval_ctx))
     goto fail;
-  }
 
-  js_debug_init(sess->eval_ctx);
-  js_debug_pause(sess->eval_ctx);
-  if (eval_file(sess->eval_ctx, filename_cstr, 1)) {
+  js_debug_wait_ready2start(sess->eval_ctx);
+  if (eval_file(sess->eval_ctx, sess->eval_file, 1)) {
     sess->eval_errmsg = "failed to eval user script";
     goto fail;
   }
@@ -353,8 +336,7 @@ void *debug_user_script(void *arg) {
   goto succ;
 
 done:
-  JS_FreeValue(sess->ctx, sess->eval_file);
-  JS_FreeCString(sess->eval_ctx, filename_cstr);
+  js_free_debug(sess->eval_ctx);
   JS_FreeContext(sess->eval_ctx);
   JS_FreeRuntime(sess->eval_rt);
 
@@ -383,8 +365,9 @@ void sess_event_handle(sess_t *sess, JSValue event) {
   if (!act_cstr)
     goto fail;
 
+  JSAtom data_atom = JS_NewAtom(sess->ctx, "data");
   args = JS_GetPropertyStr(sess->ctx, event, "data");
-  JS_DeleteProperty(sess->ctx, event, JS_NewAtom(sess->ctx, "data"), 0);
+  JS_DeleteProperty(sess->ctx, event, data_atom, 0);
 
   if (!strcmp("ping", act_cstr)) {
     JS_SetPropertyStr(sess->ctx, event, "type",
@@ -393,22 +376,36 @@ void sess_event_handle(sess_t *sess, JSValue event) {
     goto succ;
   }
 
-  if (!strcmp("run", act_cstr)) {
+  if (!strcmp("launch", act_cstr)) {
     if (sess->eval_retval == -2) {
       err_msg = "previous script is still running";
       goto fail;
     }
 
-    sess->eval_retval = -2;
-
     if (!JS_IsObject(args))
       goto fail;
 
-    sess->eval_file = JS_GetPropertyStr(sess->ctx, args, "file");
-    if (!JS_IsString(sess->eval_file)) {
-      JS_FreeValue(sess->ctx, sess->eval_file);
+    JSValue file = JS_GetPropertyStr(sess->ctx, args, "file");
+    if (!JS_IsString(file)) {
+      JS_FreeValue(sess->ctx, file);
       goto fail;
     }
+
+    const char *file_cstr = JS_ToCString(sess->ctx, file);
+    if (!file_cstr) {
+      JS_FreeValue(sess->ctx, file);
+      goto fail;
+    }
+
+    sess->eval_file = malloc(strlen(file_cstr));
+    if (!sess->eval_file) {
+      JS_FreeValue(sess->ctx, file);
+      JS_FreeCString(sess->ctx, file_cstr);
+      goto fail;
+    }
+    memcpy((void *)sess->eval_file, file_cstr, strlen(file_cstr));
+    JS_FreeCString(sess->ctx, file_cstr);
+    JS_FreeValue(sess->ctx, file);
 
     int s =
         pthread_create(&sess->eval_thread_id, NULL, &debug_user_script, sess);
@@ -417,6 +414,60 @@ void sess_event_handle(sess_t *sess, JSValue event) {
       goto fail;
     }
 
+    sess->eval_retval = -2;
+
+    goto succ;
+  }
+
+  if (!strcmp("setBreakpoint", act_cstr)) {
+    if (!JS_IsObject(args))
+      goto fail;
+
+    JSValue file = JS_GetPropertyStr(sess->ctx, args, "file");
+    if (!JS_IsString(file)) {
+      JS_FreeValue(sess->ctx, file);
+      goto fail;
+    }
+
+    const char *file_cstr = JS_ToCString(sess->ctx, file);
+    if (!file_cstr) {
+      JS_FreeValue(sess->ctx, file);
+      goto fail;
+    }
+
+    JSValue line = JS_GetPropertyStr(sess->ctx, args, "line");
+    if (!JS_IsNumber(line)) {
+      JS_FreeValue(sess->ctx, file);
+      JS_FreeValue(sess->ctx, line);
+      goto fail;
+    }
+
+    JSValue col = JS_GetPropertyStr(sess->ctx, args, "col");
+    if (!JS_IsNumber(col)) {
+      JS_FreeValue(sess->ctx, file);
+      JS_FreeValue(sess->ctx, line);
+      JS_FreeValue(sess->ctx, col);
+      goto fail;
+    }
+
+    int line_num, col_num;
+    JS_ToInt32(sess->ctx, &line_num, line);
+    JS_ToInt32(sess->ctx, &col_num, col);
+    js_debug_set_breakpoint(sess->eval_ctx, file_cstr, line_num, col_num);
+    JS_FreeCString(sess->ctx, file_cstr);
+    JS_FreeValue(sess->ctx, file);
+
+    goto succ;
+  }
+
+  if (!strcmp("run", act_cstr)) {
+    if (sess->eval_retval != -2) {
+      err_msg = "debugger does not launch yet";
+      goto fail;
+    }
+
+    js_debug_on(sess->eval_ctx);
+    js_debug_ready2start(sess->eval_ctx);
     goto succ;
   }
 
@@ -433,6 +484,7 @@ void sess_event_handle(sess_t *sess, JSValue event) {
   goto fail;
 
 done:
+  JS_FreeAtom(sess->ctx, data_atom);
   JS_FreeValue(sess->ctx, args);
   JS_FreeCString(sess->ctx, act_cstr);
   JS_FreeValue(sess->ctx, act);
@@ -443,6 +495,7 @@ succ:
   goto done;
 
 fail:
+  JS_FreeValue(sess->ctx, event);
   sess_event_send_replay(sess, new_event_err(sess, err_code, err_msg));
   goto done;
 }

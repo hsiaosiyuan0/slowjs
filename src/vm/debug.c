@@ -1,5 +1,7 @@
 #include "debug.h"
 #include "include/quickjs.h"
+#include "libs/cutils.h"
+#include "libs/list.h"
 #include "utils/dbuf.h"
 #include "vm/cfunc.h"
 #include "vm/conv.h"
@@ -7,6 +9,12 @@
 #include "vm/instr.h"
 #include "vm/intrins/intrins.h"
 #include "vm/obj.h"
+#include "vm/vm.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static JSValue sort_bp_col_asc(JSContext *ctx, JSValueConst this_val, int argc,
                                JSValueConst *argv) {
@@ -167,24 +175,165 @@ fail:
   return JS_EXCEPTION;
 }
 
-static inline int js_debug(JSRuntime *rt, void *opaque) {
-  JSContext *ctx = opaque;
-  if (ctx->debug.pause) {
-    pthread_mutex_lock(&ctx->debug.bp_mutex);
-    printf("paused\n");
-    pthread_cond_wait(&ctx->debug.bp_cond, &ctx->debug.bp_mutex);
+static JSBreakpoint js_debug_bp_from_pc(const uint8_t *pc, JSRuntime *rt,
+                                        JSContext *ctx) {
+  JSBreakpoint bpp = {0};
+
+  struct JSStackFrame *sf = rt->current_stack_frame;
+  if (!sf)
+    return bpp;
+
+  JSValue fn = sf->cur_func;
+  JSFunctionBytecode *b = JS_VALUE_GET_OBJ(fn)->u.func.function_bytecode;
+
+  size_t delta = pc - b->byte_code_buf;
+  JSAtom file = b->debug.filename;
+  JSValue debug_info = js_debug_pc2line(ctx, JS_NULL, 1, (JSValueConst *)&fn);
+  if (JS_IsException(debug_info))
+    return bpp;
+
+  JSValue pc2bp = JS_GetPropertyStr(ctx, debug_info, "pc2bp");
+  JSValue bp = JS_GetPropertyUint32(ctx, pc2bp, delta);
+  if (JS_IsUndefined(bp))
+    goto done;
+
+  bpp.file = file;
+  JSValue line = JS_GetPropertyStr(ctx, bp, "line");
+  JS_ToInt32Free(ctx, &bpp.line, line);
+  JS_FreeValue(ctx, line);
+
+  JSValue col = JS_GetPropertyStr(ctx, bp, "col");
+  JS_ToInt32Free(ctx, &bpp.col, col);
+  JS_FreeValue(ctx, col);
+
+done:
+  JS_FreeValue(ctx, bp);
+  JS_FreeValue(ctx, pc2bp);
+  JS_FreeValue(ctx, debug_info);
+  return bpp;
+}
+
+JSBreakpoint *js_debug_get_bp(JSContext *ctx, JSBreakpoint bp);
+static int js_debug_interrupt(const uint8_t *pc, JSRuntime *rt, void *opaque) {
+  JSContext *ctx;
+
+  if (unlikely(rt->debug)) {
+    ctx = opaque;
+
+    JSBreakpoint bp = js_debug_bp_from_pc(pc, rt, ctx);
+    if (bp.file && js_debug_get_bp(ctx, bp)) {
+      pthread_mutex_lock(&ctx->debug.bp_mutex);
+      pthread_cond_wait(&ctx->debug.bp_cond, &ctx->debug.bp_mutex);
+      pthread_mutex_unlock(&ctx->debug.bp_mutex);
+    }
   }
   return 0;
+}
+
+int js_debug_init(JSContext *ctx) {
+#if defined(__APPLE__)
+  ctx->debug.ready2start = dispatch_semaphore_create(0);
+#else
+  if (sem_init(&ctx->debug.ready2start, 0, 0))
+    return -1;
+#endif
+
+  if (pthread_mutex_init(&ctx->debug.bp_mutex, NULL))
+    return -1;
+
+  if (pthread_cond_init(&ctx->debug.bp_cond, NULL))
+    return -1;
+
+  init_list_head(&ctx->debug.bps);
+
+  JS_SetPCInterruptHandler(ctx->rt, &js_debug_interrupt, ctx);
+  return 0;
+}
+
+void js_debug_wait_ready2start(JSContext *ctx) {
+#if defined(__APPLE__)
+  dispatch_semaphore_wait(ctx->debug.ready2start, DISPATCH_TIME_FOREVER);
+#else
+  int r;
+  do {
+    r = sem_wait(&s->sem);
+  } while (r == -1 && errno == EINTR);
+#endif
+}
+
+void js_debug_ready2start(JSContext *ctx) {
+#if defined(__APPLE__)
+  dispatch_semaphore_signal(ctx->debug.ready2start);
+#else
+  sem_post(&s->sem);
+#endif
+}
+
+void js_debug_on(JSContext *ctx) { ctx->rt->debug = TRUE; }
+void js_debug_off(JSContext *ctx) { ctx->rt->debug = FALSE; }
+
+void js_debug_free_bp(JSContext *ctx, JSBreakpoint *bp) {
+  JS_FreeAtom(ctx, bp->file);
+  free(bp);
+}
+
+void js_free_debug(JSContext *ctx) {
+  struct list_head *el;
+  JSBreakpoint *bp;
+
+  pthread_mutex_destroy(&ctx->debug.bp_mutex);
+  pthread_cond_destroy(&ctx->debug.bp_cond);
+
+  list_for_each(el, &ctx->debug.bps) {
+    bp = list_entry(el, JSBreakpoint, link);
+    js_debug_free_bp(ctx, bp);
+  }
+}
+
+JSBreakpoint *js_debug_get_bp(JSContext *ctx, JSBreakpoint bp) {
+  struct list_head *el;
+  JSBreakpoint *iter = NULL;
+  JSBreakpoint *bpp = NULL;
+
+  list_for_each(el, &ctx->debug.bps) {
+    iter = list_entry(el, JSBreakpoint, link);
+    if (iter->file == bp.file && iter->line == bp.line &&
+        (bp.col == -1 || iter->col == bp.col)) {
+      bpp = iter;
+      break;
+    }
+  }
+  return bpp;
+}
+
+int js_debug_add_bp(JSContext *ctx, JSBreakpoint bp) {
+  JSBreakpoint *bpp;
+  if (js_debug_get_bp(ctx, bp))
+    return 0;
+
+  bpp = malloc(sizeof(*bpp));
+  if (!bpp)
+    return -1;
+
+  memcpy(bpp, &bp, sizeof(bp));
+  list_add_tail(&bpp->link, &ctx->debug.bps);
+  return 0;
+}
+
+void js_debug_del_bp(JSContext *ctx, JSBreakpoint bp) {
+  JSBreakpoint *bpp = js_debug_get_bp(ctx, bp);
+  if (bpp) {
+    list_del(&bpp->link);
+    js_debug_free_bp(ctx, bpp);
+  }
+}
+
+int js_debug_set_breakpoint(JSContext *ctx, const char *file, int line,
+                            int col) {
+  return js_debug_add_bp(ctx, (JSBreakpoint){(struct list_head){},
+                                             JS_NewAtom(ctx, file), line, col});
 }
 
 void js_debug_continue(JSContext *ctx) {
   pthread_cond_signal(&ctx->debug.bp_cond);
 }
-
-void js_debug_init(JSContext *ctx) {
-  pthread_mutex_init(&ctx->debug.bp_mutex, NULL);
-  pthread_cond_init(&ctx->debug.bp_cond, NULL);
-  JS_SetInterruptHandler(ctx->rt, &js_debug, ctx);
-}
-
-void js_debug_pause(JSContext *ctx) { ctx->debug.pause = TRUE; }
