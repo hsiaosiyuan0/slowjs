@@ -256,7 +256,7 @@ void js_debug_wait_ready2start(JSContext *ctx) {
 #else
   int r;
   do {
-    r = sem_wait(&s->sem);
+    r = sem_wait(&ctx->debug.ready2start);
   } while (r == -1 && errno == EINTR);
 #endif
 }
@@ -265,7 +265,7 @@ void js_debug_ready2start(JSContext *ctx) {
 #if defined(__APPLE__)
   dispatch_semaphore_signal(ctx->debug.ready2start);
 #else
-  sem_post(&s->sem);
+  sem_post(&ctx->debug.ready2start);
 #endif
 }
 
