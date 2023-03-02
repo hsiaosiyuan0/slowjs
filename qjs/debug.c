@@ -481,6 +481,39 @@ void sess_event_handle(sess_t *sess, JSValue event) {
     goto succ;
   }
 
+  if (!strcmp("availableBreakpoints", act_cstr)) {
+    JSValue bps = js_debug_list_breakpoints(sess->eval_ctx);
+    JSValue ser = JS_JSONStringify(sess->eval_ctx, bps, JS_NULL,
+                                   JS_NewInt32(sess->eval_ctx, 2));
+    if (JS_IsException(ser)) {
+      JS_FreeValue(sess->eval_ctx, bps);
+      goto fail;
+    }
+
+    size_t len;
+    const char *ser_cstr = JS_ToCStringLen(sess->eval_ctx, &len, ser);
+    if (!ser_cstr) {
+      JS_FreeValue(sess->eval_ctx, ser);
+      JS_FreeValue(sess->eval_ctx, bps);
+      goto fail;
+    }
+
+    JSValue de = JS_ParseJSON(sess->ctx, ser_cstr, len, "<input>");
+    if (JS_IsException(de)) {
+      JS_FreeCString(sess->eval_ctx, ser_cstr);
+      JS_FreeValue(sess->eval_ctx, ser);
+      JS_FreeValue(sess->eval_ctx, bps);
+      goto fail;
+    }
+
+    JS_SetPropertyStr(sess->ctx, event, "data", de);
+
+    JS_FreeCString(sess->eval_ctx, ser_cstr);
+    JS_FreeValue(sess->eval_ctx, ser);
+    JS_FreeValue(sess->eval_ctx, bps);
+    goto succ;
+  }
+
   goto fail;
 
 done:

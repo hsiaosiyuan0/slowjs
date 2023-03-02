@@ -325,9 +325,8 @@ struct JSContext {
 #endif
     pthread_mutex_t bp_mutex;
     pthread_cond_t bp_cond;
+    BOOL paused;
     struct list_head bps;
-    const char *entry;
-    BOOL pause;
   } debug;
 
   void *user_opaque;

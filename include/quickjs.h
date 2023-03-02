@@ -1105,6 +1105,10 @@ int js_debug_del_breakpoint(JSContext *ctx, const char *file, int line,
                             int col);
 void js_debug_continue(JSContext *ctx);
 
+// list all the available breakpoints of currently paused function
+// Note: only use this method when vm is paused by breakpoint hit
+JSValue js_debug_list_breakpoints(JSContext *ctx);
+
 #undef js_unlikely
 #undef js_force_inline
 

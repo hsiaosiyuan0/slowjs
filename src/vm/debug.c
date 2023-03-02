@@ -8,12 +8,9 @@
 #include "vm/func.h"
 #include "vm/instr.h"
 #include "vm/intrins/intrins.h"
+#include "vm/mod.h"
 #include "vm/obj.h"
 #include "vm/vm.h"
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 static JSValue sort_bp_col_asc(JSContext *ctx, JSValueConst this_val, int argc,
@@ -175,6 +172,16 @@ fail:
   return JS_EXCEPTION;
 }
 
+// list all the available breakpoints of currently paused function
+// Note: only use this method when vm is paused by breakpoint hit
+JSValue js_debug_list_breakpoints(JSContext *ctx) {
+  struct JSStackFrame *sf = ctx->rt->current_stack_frame;
+  if (!ctx->debug.paused || !sf)
+    return JS_NULL;
+
+  return js_debug_pc2line(ctx, JS_NULL, 1, (JSValue *)&sf->cur_func);
+}
+
 static JSBreakpoint js_debug_bp_from_pc(const uint8_t *pc, JSRuntime *rt,
                                         JSContext *ctx) {
   JSBreakpoint bpp = {0};
@@ -223,7 +230,9 @@ static int js_debug_interrupt(const uint8_t *pc, JSRuntime *rt, void *opaque) {
     JSBreakpoint bp = js_debug_bp_from_pc(pc, rt, ctx);
     if (bp.file && js_debug_get_bp(ctx, bp)) {
       pthread_mutex_lock(&ctx->debug.bp_mutex);
+      ctx->debug.paused = TRUE;
       pthread_cond_wait(&ctx->debug.bp_cond, &ctx->debug.bp_mutex);
+      ctx->debug.paused = FALSE;
       pthread_mutex_unlock(&ctx->debug.bp_mutex);
     }
   }
@@ -335,5 +344,8 @@ int js_debug_set_breakpoint(JSContext *ctx, const char *file, int line,
 }
 
 void js_debug_continue(JSContext *ctx) {
+  if (!ctx->debug.paused)
+    return;
+
   pthread_cond_signal(&ctx->debug.bp_cond);
 }
