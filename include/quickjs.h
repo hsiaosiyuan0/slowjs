@@ -1109,6 +1109,11 @@ void js_debug_continue(JSContext *ctx);
 // Note: only use this method when vm is paused by breakpoint hit
 JSValue js_debug_list_breakpoints(JSContext *ctx);
 
+// list the args, vars and var_refs in the stackframe of current paused
+// function execution
+// Note: only use this method when vm is paused by breakpoint hit
+JSValue js_debug_dump_stackframe(JSContext *ctx);
+
 #undef js_unlikely
 #undef js_force_inline
 

@@ -11,7 +11,9 @@
 #include "vm/mod.h"
 #include "vm/obj.h"
 #include "vm/vm.h"
-#include <string.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 static JSValue sort_bp_col_asc(JSContext *ctx, JSValueConst this_val, int argc,
                                JSValueConst *argv) {
@@ -29,8 +31,7 @@ static JSValue sort_bp_col_asc(JSContext *ctx, JSValueConst this_val, int argc,
 JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
                          JSValueConst *argv) {
   JSValue bps, pc2line, ret, line2bps, pc2bp, line_bps, line_bps_arr, sort_fn,
-      line_bps_arr_len;
-  BOOL line_bps_new = FALSE;
+      pc2bp_bps, pc2bp_first, line_bps_arr_len;
   uint8_t *buf = NULL, *buf_pos = NULL;
   const uint8_t *buf_end = NULL;
   JSObject *p = NULL;
@@ -117,21 +118,40 @@ JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
     JS_SetPropertyStr(ctx, pc2line, "col", JS_NewInt32(ctx, col));
     JS_SetPropertyUint32(ctx, bps, i++, pc2line);
 
-    JS_SetPropertyUint32(ctx, pc2bp, pc, JS_DupValue(ctx, pc2line));
+    pc2bp_bps = JS_GetPropertyUint32(ctx, pc2bp, pc);
+    if (JS_IsUndefined(pc2bp_bps)) {
+      pc2bp_bps = JS_NewArray(ctx);
+      if (JS_IsException(pc2bp_bps))
+        goto fail;
+      JS_SetPropertyUint32(ctx, pc2bp, pc, pc2bp_bps);
+      JS_DupValue(ctx, pc2bp_bps); // to balance refcount
 
-    line_bps_new = FALSE;
+      pc2bp_first = JS_NewObject(ctx);
+      if (JS_IsException(pc2bp_first)) {
+        JS_FreeValue(ctx, pc2bp_bps);
+        goto fail;
+      }
+
+      JS_SetPropertyStr(ctx, pc2bp_first, "op", JS_NewString(ctx, oi->name));
+      JS_SetPropertyStr(ctx, pc2bp_first, "pc", JS_NewInt32(ctx, pc));
+      JS_SetPropertyStr(ctx, pc2bp_first, "line", JS_NewInt32(ctx, line));
+      JS_SetPropertyStr(ctx, pc2bp_first, "col", JS_NewInt32(ctx, 0));
+      js_array_push(ctx, pc2bp_bps, 1, (JSValueConst *)&pc2bp_first, 0);
+      JS_FreeValue(ctx, pc2bp_first);
+    }
+    js_array_push(ctx, pc2bp_bps, 1, (JSValueConst *)&pc2line, 0);
+    JS_FreeValue(ctx, pc2bp_bps);
+
     line_bps = JS_GetPropertyUint32(ctx, line2bps, line);
     if (JS_IsUndefined(line_bps)) {
       line_bps = JS_NewArray(ctx);
       if (JS_IsException(line_bps))
         goto fail3;
-      line_bps_new = TRUE;
       JS_SetPropertyUint32(ctx, line2bps, line, line_bps);
+      JS_DupValue(ctx, line_bps); // to balance refcount
     }
     js_array_push(ctx, line_bps, 1, (JSValueConst *)&pc2line, 0);
-    if (!line_bps_new) { // balance ref_count
-      JS_FreeValue(ctx, line_bps);
-    }
+    JS_FreeValue(ctx, line_bps);
   }
 
   line_bps_arr = js_object_keys(ctx, JS_NULL, 1, (JSValueConst *)&line2bps,
@@ -182,13 +202,97 @@ JSValue js_debug_list_breakpoints(JSContext *ctx) {
   return js_debug_pc2line(ctx, JS_NULL, 1, (JSValue *)&sf->cur_func);
 }
 
-static JSBreakpoint js_debug_bp_from_pc(const uint8_t *pc, JSRuntime *rt,
-                                        JSContext *ctx) {
-  JSBreakpoint bpp = {0};
+// list the args, vars and var_refs in the stackframe of current paused
+// function execution
+// Note: only use this method when vm is paused by breakpoint hit
+JSValue js_debug_dump_stackframe(JSContext *ctx) {
+  struct JSStackFrame *sf = ctx->rt->current_stack_frame;
+  if (!ctx->debug.paused || !sf)
+    return JS_NULL;
 
+  JSValue fn = sf->cur_func;
+  if (JS_IsUndefined(fn))
+    return JS_NULL;
+
+  JSObject *p = JS_VALUE_GET_OBJ(fn);
+  JSFunctionBytecode *b = p->u.func.function_bytecode;
+
+  JSValue ret = JS_NewObject(ctx);
+  if (JS_IsException(ret))
+    return JS_NULL;
+
+  JSValue args = JS_NewArray(ctx);
+  if (JS_IsException(args))
+    goto fail;
+  JS_SetPropertyStr(ctx, ret, "args", args);
+
+  JSValue vars = JS_NewArray(ctx);
+  if (JS_IsException(vars))
+    goto fail;
+  JS_SetPropertyStr(ctx, ret, "vars", vars);
+
+  JSValue closure_vars = JS_NewArray(ctx);
+  if (JS_IsException(vars))
+    goto fail;
+  JS_SetPropertyStr(ctx, ret, "closure_vars", closure_vars);
+
+  for (int i = 0; i < sf->arg_count; i++) {
+    JSValue arg = JS_NewObject(ctx);
+    if (JS_IsException(arg))
+      goto fail;
+
+    JSVarDef vd = b->vardefs[i];
+    JS_SetPropertyStr(ctx, arg, "name", JS_AtomToString(ctx, vd.var_name));
+    JS_SetPropertyStr(ctx, arg, "value", JS_DupValue(ctx, sf->arg_buf[i]));
+    js_array_push(ctx, args, 1, (JSValueConst *)&arg, 0);
+    JS_FreeValue(ctx, arg);
+  }
+
+  for (int i = 0; i < b->var_count; i++) {
+    JSValue var = JS_NewObject(ctx);
+    if (JS_IsException(var))
+      goto fail;
+
+    JSVarDef vd = b->vardefs[b->arg_count + i];
+    JS_SetPropertyStr(ctx, var, "name", JS_AtomToString(ctx, vd.var_name));
+    JS_SetPropertyStr(ctx, var, "value", JS_DupValue(ctx, sf->var_buf[i]));
+    js_array_push(ctx, vars, 1, (JSValueConst *)&var, 0);
+    JS_FreeValue(ctx, var);
+  }
+
+  JSVarRef **var_refs = p->u.func.var_refs;
+  for (int i = 0; i < b->closure_var_count; i++) {
+    JSValue var = JS_NewObject(ctx);
+    if (JS_IsException(var))
+      goto fail;
+
+    JSClosureVar cv = b->closure_var[i];
+    JS_SetPropertyStr(ctx, var, "name", JS_AtomToString(ctx, cv.var_name));
+
+    JS_SetPropertyStr(ctx, var, "value",
+                      JS_DupValue(ctx, *var_refs[i]->pvalue));
+    js_array_push(ctx, closure_vars, 1, (JSValueConst *)&var, 0);
+    JS_FreeValue(ctx, var);
+  }
+
+  return ret;
+
+fail:
+  JS_FreeValue(ctx, ret);
+  return JS_NULL;
+}
+
+// retrieve breakpoints at pc, the length of returned array is [0, 2]
+static JSBreakpoint *js_debug_bps_from_pc(const uint8_t *pc, JSRuntime *rt,
+                                          JSContext *ctx, uint32_t *len) {
+
+  JSBreakpoint *ret = NULL;
+  JSValue bps, bp, line, col;
   struct JSStackFrame *sf = rt->current_stack_frame;
+  *len = 0;
+
   if (!sf)
-    return bpp;
+    return NULL;
 
   JSValue fn = sf->cur_func;
   JSFunctionBytecode *b = JS_VALUE_GET_OBJ(fn)->u.func.function_bytecode;
@@ -197,27 +301,41 @@ static JSBreakpoint js_debug_bp_from_pc(const uint8_t *pc, JSRuntime *rt,
   JSAtom file = b->debug.filename;
   JSValue debug_info = js_debug_pc2line(ctx, JS_NULL, 1, (JSValueConst *)&fn);
   if (JS_IsException(debug_info))
-    return bpp;
+    return NULL;
 
+  // `debug_info` always has `pc2bp`
   JSValue pc2bp = JS_GetPropertyStr(ctx, debug_info, "pc2bp");
-  JSValue bp = JS_GetPropertyUint32(ctx, pc2bp, delta);
-  if (JS_IsUndefined(bp))
+  bps = JS_GetPropertyUint32(ctx, pc2bp, delta);
+  if (JS_IsUndefined(bps))
     goto done;
 
-  bpp.file = file;
-  JSValue line = JS_GetPropertyStr(ctx, bp, "line");
-  JS_ToInt32Free(ctx, &bpp.line, line);
-  JS_FreeValue(ctx, line);
+  if (js_get_length32(ctx, len, bps) || *len == 0)
+    goto done;
 
-  JSValue col = JS_GetPropertyStr(ctx, bp, "col");
-  JS_ToInt32Free(ctx, &bpp.col, col);
-  JS_FreeValue(ctx, col);
+  ret = calloc(*len, sizeof(JSBreakpoint));
+  if (!ret)
+    goto done;
+
+  for (uint32_t i = 0; i < *len; i++) {
+    bp = JS_GetPropertyUint32(ctx, bps, i);
+
+    ret[i].file = file;
+    line = JS_GetPropertyStr(ctx, bp, "line");
+    JS_ToInt32Free(ctx, &ret[i].line, line);
+    JS_FreeValue(ctx, line);
+
+    col = JS_GetPropertyStr(ctx, bp, "col");
+    JS_ToInt32Free(ctx, &ret[i].col, col);
+    JS_FreeValue(ctx, line);
+
+    JS_FreeValue(ctx, bp);
+  }
 
 done:
-  JS_FreeValue(ctx, bp);
+  JS_FreeValue(ctx, bps);
   JS_FreeValue(ctx, pc2bp);
   JS_FreeValue(ctx, debug_info);
-  return bpp;
+  return ret;
 }
 
 JSBreakpoint *js_debug_get_bp(JSContext *ctx, JSBreakpoint bp);
@@ -227,13 +345,20 @@ static int js_debug_interrupt(const uint8_t *pc, JSRuntime *rt, void *opaque) {
   if (unlikely(rt->debug)) {
     ctx = opaque;
 
-    JSBreakpoint bp = js_debug_bp_from_pc(pc, rt, ctx);
-    if (bp.file && js_debug_get_bp(ctx, bp)) {
-      pthread_mutex_lock(&ctx->debug.bp_mutex);
-      ctx->debug.paused = TRUE;
-      pthread_cond_wait(&ctx->debug.bp_cond, &ctx->debug.bp_mutex);
-      ctx->debug.paused = FALSE;
-      pthread_mutex_unlock(&ctx->debug.bp_mutex);
+    uint32_t len;
+    JSBreakpoint *bps = js_debug_bps_from_pc(pc, rt, ctx, &len);
+    if (len == 0)
+      return 0;
+
+    for (uint32_t i = 0; i < len; i++) {
+      if (bps[i].file && js_debug_get_bp(ctx, bps[i])) {
+        pthread_mutex_lock(&ctx->debug.bp_mutex);
+        ctx->debug.paused = TRUE;
+        pthread_cond_wait(&ctx->debug.bp_cond, &ctx->debug.bp_mutex);
+        ctx->debug.paused = FALSE;
+        pthread_mutex_unlock(&ctx->debug.bp_mutex);
+        break;
+      }
     }
   }
   return 0;
@@ -299,6 +424,7 @@ void js_free_debug(JSContext *ctx) {
   }
 }
 
+// get breakpoint from the breakpoints collection manually specified by user
 JSBreakpoint *js_debug_get_bp(JSContext *ctx, JSBreakpoint bp) {
   struct list_head *el;
   JSBreakpoint *iter = NULL;
@@ -306,8 +432,7 @@ JSBreakpoint *js_debug_get_bp(JSContext *ctx, JSBreakpoint bp) {
 
   list_for_each(el, &ctx->debug.bps) {
     iter = list_entry(el, JSBreakpoint, link);
-    if (iter->file == bp.file && iter->line == bp.line &&
-        (bp.col == -1 || iter->col == bp.col)) {
+    if (iter->file == bp.file && iter->line == bp.line && iter->col == bp.col) {
       bpp = iter;
       break;
     }
@@ -315,6 +440,7 @@ JSBreakpoint *js_debug_get_bp(JSContext *ctx, JSBreakpoint bp) {
   return bpp;
 }
 
+// add breakpoint to the breakpoints collection manually specified by user
 int js_debug_add_bp(JSContext *ctx, JSBreakpoint bp) {
   JSBreakpoint *bpp;
   if (js_debug_get_bp(ctx, bp))

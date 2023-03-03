@@ -313,6 +313,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
     if (s->token.val != ';' && s->token.val != '}' && !s->got_lf) {
       if (js_parse_expr(s))
         goto fail;
+      s->loc = loc;
       emit_return(s, TRUE);
     } else {
       s->loc = loc;

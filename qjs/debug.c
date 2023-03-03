@@ -353,6 +353,27 @@ fail:
   goto done;
 }
 
+JSValue copy_val_cross_ctx(JSValue from_val, JSContext *from_ctx,
+                           JSContext *to_ctx) {
+  JSValue ser =
+      JS_JSONStringify(from_ctx, from_val, JS_NULL, JS_NewInt32(from_ctx, 2));
+
+  size_t len;
+  const char *ser_cstr = JS_ToCStringLen(from_ctx, &len, ser);
+  if (!ser_cstr) {
+    JS_FreeValue(from_ctx, ser);
+    return JS_NULL;
+  }
+
+  JSValue de = JS_ParseJSON(to_ctx, ser_cstr, len, "<input>");
+  if (JS_IsException(de)) {
+    JS_FreeValue(from_ctx, ser);
+    return JS_NULL;
+  }
+
+  return de;
+}
+
 void sess_event_handle(sess_t *sess, JSValue event) {
   JSValue act = JS_NULL, args = JS_NULL;
   const char *act_cstr;
@@ -397,13 +418,13 @@ void sess_event_handle(sess_t *sess, JSValue event) {
       goto fail;
     }
 
-    sess->eval_file = malloc(strlen(file_cstr));
+    sess->eval_file = malloc(strlen(file_cstr) + 1);
     if (!sess->eval_file) {
       JS_FreeValue(sess->ctx, file);
       JS_FreeCString(sess->ctx, file_cstr);
       goto fail;
     }
-    memcpy((void *)sess->eval_file, file_cstr, strlen(file_cstr));
+    memcpy((void *)sess->eval_file, file_cstr, strlen(file_cstr) + 1);
     JS_FreeCString(sess->ctx, file_cstr);
     JS_FreeValue(sess->ctx, file);
 
@@ -483,34 +504,16 @@ void sess_event_handle(sess_t *sess, JSValue event) {
 
   if (!strcmp("availableBreakpoints", act_cstr)) {
     JSValue bps = js_debug_list_breakpoints(sess->eval_ctx);
-    JSValue ser = JS_JSONStringify(sess->eval_ctx, bps, JS_NULL,
-                                   JS_NewInt32(sess->eval_ctx, 2));
-    if (JS_IsException(ser)) {
-      JS_FreeValue(sess->eval_ctx, bps);
-      goto fail;
-    }
-
-    size_t len;
-    const char *ser_cstr = JS_ToCStringLen(sess->eval_ctx, &len, ser);
-    if (!ser_cstr) {
-      JS_FreeValue(sess->eval_ctx, ser);
-      JS_FreeValue(sess->eval_ctx, bps);
-      goto fail;
-    }
-
-    JSValue de = JS_ParseJSON(sess->ctx, ser_cstr, len, "<input>");
-    if (JS_IsException(de)) {
-      JS_FreeCString(sess->eval_ctx, ser_cstr);
-      JS_FreeValue(sess->eval_ctx, ser);
-      JS_FreeValue(sess->eval_ctx, bps);
-      goto fail;
-    }
-
-    JS_SetPropertyStr(sess->ctx, event, "data", de);
-
-    JS_FreeCString(sess->eval_ctx, ser_cstr);
-    JS_FreeValue(sess->eval_ctx, ser);
+    JS_SetPropertyStr(sess->ctx, event, "data",
+                      copy_val_cross_ctx(bps, sess->eval_ctx, sess->ctx));
     JS_FreeValue(sess->eval_ctx, bps);
+    goto succ;
+  }
+
+  if (!strcmp("dumpStackframe", act_cstr)) {
+    JSValue info = js_debug_dump_stackframe(sess->eval_ctx);
+    JS_SetPropertyStr(sess->ctx, event, "data",
+                      copy_val_cross_ctx(info, sess->eval_ctx, sess->ctx));
     goto succ;
   }
 
