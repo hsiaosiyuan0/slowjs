@@ -367,10 +367,11 @@ JSValue copy_val_cross_ctx(JSValue from_val, JSContext *from_ctx,
 
   JSValue de = JS_ParseJSON(to_ctx, ser_cstr, len, "<input>");
   if (JS_IsException(de)) {
-    JS_FreeValue(from_ctx, ser);
-    return JS_NULL;
+    de = JS_NULL;
   }
-
+  
+  JS_FreeValue(from_ctx, ser);
+  JS_FreeCString(from_ctx, ser_cstr);
   return de;
 }
 
@@ -514,6 +515,7 @@ void sess_event_handle(sess_t *sess, JSValue event) {
     JSValue info = js_debug_dump_stackframe(sess->eval_ctx);
     JS_SetPropertyStr(sess->ctx, event, "data",
                       copy_val_cross_ctx(info, sess->eval_ctx, sess->ctx));
+    JS_FreeValue(sess->eval_ctx, info);
     goto succ;
   }
 

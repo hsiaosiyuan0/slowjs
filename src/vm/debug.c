@@ -125,6 +125,17 @@ JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
         goto fail;
       JS_SetPropertyUint32(ctx, pc2bp, pc, pc2bp_bps);
       JS_DupValue(ctx, pc2bp_bps); // to balance refcount
+    }
+    js_array_push(ctx, pc2bp_bps, 1, (JSValueConst *)&pc2line, 0);
+    JS_FreeValue(ctx, pc2bp_bps);
+
+    line_bps = JS_GetPropertyUint32(ctx, line2bps, line);
+    if (JS_IsUndefined(line_bps)) {
+      line_bps = JS_NewArray(ctx);
+      if (JS_IsException(line_bps))
+        goto fail3;
+      JS_SetPropertyUint32(ctx, line2bps, line, line_bps);
+      JS_DupValue(ctx, line_bps); // to balance refcount
 
       pc2bp_first = JS_NewObject(ctx);
       if (JS_IsException(pc2bp_first)) {
@@ -138,17 +149,6 @@ JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
       JS_SetPropertyStr(ctx, pc2bp_first, "col", JS_NewInt32(ctx, 0));
       js_array_push(ctx, pc2bp_bps, 1, (JSValueConst *)&pc2bp_first, 0);
       JS_FreeValue(ctx, pc2bp_first);
-    }
-    js_array_push(ctx, pc2bp_bps, 1, (JSValueConst *)&pc2line, 0);
-    JS_FreeValue(ctx, pc2bp_bps);
-
-    line_bps = JS_GetPropertyUint32(ctx, line2bps, line);
-    if (JS_IsUndefined(line_bps)) {
-      line_bps = JS_NewArray(ctx);
-      if (JS_IsException(line_bps))
-        goto fail3;
-      JS_SetPropertyUint32(ctx, line2bps, line, line_bps);
-      JS_DupValue(ctx, line_bps); // to balance refcount
     }
     js_array_push(ctx, line_bps, 1, (JSValueConst *)&pc2line, 0);
     JS_FreeValue(ctx, line_bps);
