@@ -1,6 +1,170 @@
 ## SlowJS
 
-Learning the awesome [QuickJS](https://github.com/bellard/quickjs), QuickJS is quick but I'll make it slow
+SlowJS - QuickJS is quick but I can make it slow!
+
+Learning the awesome [QuickJS](https://github.com/bellard/quickjs) by extending it with below functionalities:
+
+- [x] Divide the 5.4W LoC file `quickjs.c` into multiple small files, which makes the code easy to browser and navigate
+- [x] A debugger which supports inline breakpoints and includes web interfaces which is easy to integrated with the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
+- [ ] Dump the GC managed objects and view the results in the Chrome inspector
+
+## Debugger
+
+The debugger can be tasted by following steps:
+
+1. Build our SlowJS:
+
+```bash
+cmake -S . --preset=default
+cmake --build --preset=qjs
+```
+
+the location of the built stuff is `./build/qjs/qjs`
+
+2. Make up a file `tmp_test.js` to test:
+
+```js
+function add(a, b) {
+  const c = a + b;
+  return c;
+}
+
+function sub(a, b) {
+  const c = a - b;
+  return c;
+}
+
+function doSth(a, b) {
+  return add(a, b) + sub(a, b);
+}
+
+print(doSth(1, 2));
+```
+
+3. Start the debugger:
+
+```bash
+./build/qjs/qjs --debug 809
+```
+
+3. Connect to the debugger:
+
+```bash
+nc 0.0.0.0 8097
+```
+
+We use `nc` to communicate with the debugger server, then we can paste come commands to perform debug
+
+4. Call the debugger to launch a new session:
+
+```json
+{ "type": "launch", "data": { "file": "./tmp_test.js" } }
+```
+
+Paste above json into the `nc` REPL and press `ENTER`
+
+5. Set breakpoints:
+
+```json
+{ "type": "setBreakpoint", "data": { "file": "./tmp_test.js", "line": 3, "col": 0 } }
+```
+
+```json
+{ "type": "setBreakpoint", "data": { "file": "./tmp_test.js", "line": 8, "col": 0 } }
+```
+
+6. Star to run our test script:
+
+```json
+{ "type": "run" }
+```
+
+7. Now the debugger is paused at the first breakpoint, we can list the stack frames:
+
+```json
+{ "type": "listStackframes" }
+```
+
+the output looks like:
+
+```json
+{
+  "type": "listStackframes",
+  "data": [
+    {
+      "name": "add",
+      "file": "./tmp_test.js",
+      "line": 1
+    },
+    {
+      "name": "doSth",
+      "file": "./tmp_test.js",
+      "line": 11
+    },
+    {
+      "name": "<eval>",
+      "file": "./tmp_test.js",
+      "line": 1
+    }
+  ]
+}
+```
+
+8. We can resume the debugger by issuing below command:
+
+```json
+{ "type": "continue" }
+```
+
+9. Now the debugger is paused at the second breakpoint, we can print the variable in the topmost stack frame:
+
+```json
+{ "type": "dumpStackframe", "data": { "i": 0 }  }
+```
+
+the output looks like:
+
+```json
+{
+  "type": "dumpStackframe",
+  "data": {
+    "args": [
+      {
+        "name": "a",
+        "value": 1
+      },
+      {
+        "name": "b",
+        "value": 2
+      }
+    ],
+    "vars": [
+      {
+        "name": "c",
+        "value": -1
+      }
+    ],
+    "closure_vars": [],
+    "name": "sub",
+    "file": "./tmp_test.js",
+    "line": 6
+  }
+}
+```
+
+10. We can use the `continue` command resume the debugger again:
+
+```json
+{ "type": "continue" }
+```
+
+11. Now the test script is done and the debugger server prints the final results:
+
+```bash
+client closed, stopping sess thread...
+new sess thread is running...
+2
+```
 
 ## Development
 
