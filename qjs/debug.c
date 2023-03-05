@@ -369,7 +369,7 @@ JSValue copy_val_cross_ctx(JSValue from_val, JSContext *from_ctx,
   if (JS_IsException(de)) {
     de = JS_NULL;
   }
-  
+
   JS_FreeValue(from_ctx, ser);
   JS_FreeCString(from_ctx, ser_cstr);
   return de;
@@ -512,10 +512,27 @@ void sess_event_handle(sess_t *sess, JSValue event) {
   }
 
   if (!strcmp("dumpStackframe", act_cstr)) {
-    JSValue info = js_debug_dump_stackframe(sess->eval_ctx);
+    JSValue i = JS_GetPropertyStr(sess->ctx, args, "i");
+    if (!JS_IsNumber(i)) {
+      JS_FreeValue(sess->ctx, i);
+      goto fail;
+    }
+
+    int idx = 0;
+    JS_ToInt32(sess->ctx, &idx, i);
+    JSValue info = js_debug_dump_stackframe(sess->eval_ctx, idx);
     JS_SetPropertyStr(sess->ctx, event, "data",
                       copy_val_cross_ctx(info, sess->eval_ctx, sess->ctx));
     JS_FreeValue(sess->eval_ctx, info);
+    JS_FreeValue(sess->ctx, i);
+    goto succ;
+  }
+
+  if (!strcmp("listStackframes", act_cstr)) {
+    JSValue frames = js_debug_list_stackframes(sess->eval_ctx);
+    JS_SetPropertyStr(sess->ctx, event, "data",
+                      copy_val_cross_ctx(frames, sess->eval_ctx, sess->ctx));
+    JS_FreeValue(sess->eval_ctx, frames);
     goto succ;
   }
 

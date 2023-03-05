@@ -202,11 +202,59 @@ JSValue js_debug_list_breakpoints(JSContext *ctx) {
   return js_debug_pc2line(ctx, JS_NULL, 1, (JSValue *)&sf->cur_func);
 }
 
+JSValue js_debug_list_stackframes(JSContext *ctx) {
+  struct JSStackFrame *sf = ctx->rt->current_stack_frame;
+  JSValue ret = JS_NewArray(ctx);
+  if (JS_IsException(ret))
+    return JS_NULL;
+
+  if (!sf)
+    return ret;
+
+  while (sf) {
+    JSValue frame = JS_NewObject(ctx);
+    if (JS_IsException(frame))
+      goto fail;
+
+    JSValue fn = sf->cur_func;
+    if (!JS_IsUndefined(fn)) {
+      JSObject *p = JS_VALUE_GET_OBJ(fn);
+      JSFunctionBytecode *b = p->u.func.function_bytecode;
+      JS_SetPropertyStr(ctx, frame, "name", JS_AtomToString(ctx, b->func_name));
+      JS_SetPropertyStr(ctx, frame, "file",
+                        JS_AtomToString(ctx, b->debug.filename));
+      JS_SetPropertyStr(ctx, frame, "line",
+                        JS_NewInt32(ctx, b->debug.line_num));
+      js_array_push(ctx, ret, 1, (JSValueConst *)&frame, 0);
+    }
+    JS_FreeValue(ctx, frame);
+    sf = sf->prev_frame;
+  }
+
+  return ret;
+
+fail:
+  JS_FreeValue(ctx, ret);
+  return JS_NULL;
+}
+
+struct JSStackFrame *js_debug_get_stackframe(JSContext *ctx, int i) {
+  struct JSStackFrame *sf = ctx->rt->current_stack_frame;
+  int idx = 0;
+  while (sf) {
+    if (idx == i)
+      return sf;
+    sf = sf->prev_frame;
+    idx += 1;
+  }
+  return sf;
+}
+
 // list the args, vars and var_refs in the stackframe of current paused
 // function execution
 // Note: only use this method when vm is paused by breakpoint hit
-JSValue js_debug_dump_stackframe(JSContext *ctx) {
-  struct JSStackFrame *sf = ctx->rt->current_stack_frame;
+JSValue js_debug_dump_stackframe(JSContext *ctx, int i) {
+  struct JSStackFrame *sf = js_debug_get_stackframe(ctx, i);
   if (!ctx->debug.paused || !sf)
     return JS_NULL;
 
@@ -274,6 +322,10 @@ JSValue js_debug_dump_stackframe(JSContext *ctx) {
     js_array_push(ctx, closure_vars, 1, (JSValueConst *)&var, 0);
     JS_FreeValue(ctx, var);
   }
+
+  JS_SetPropertyStr(ctx, ret, "name", JS_AtomToString(ctx, b->func_name));
+  JS_SetPropertyStr(ctx, ret, "file", JS_AtomToString(ctx, b->debug.filename));
+  JS_SetPropertyStr(ctx, ret, "line", JS_NewInt32(ctx, b->debug.line_num));
 
   return ret;
 
