@@ -9,6 +9,10 @@
 #include "obj.h"
 #include "parse/parse.h"
 
+#ifdef DUMP_LEAKS
+#include "dump.h"
+#endif
+
 /* -- JSContext --------------------------------- */
 
 JSContext *JS_NewContextRaw(JSRuntime *rt) {
@@ -614,6 +618,12 @@ void JS_SetInterruptHandler(JSRuntime *rt, JSInterruptHandler *cb,
                             void *opaque) {
   rt->interrupt_handler = cb;
   rt->interrupt_opaque = opaque;
+}
+
+void JS_SetPCInterruptHandler(JSRuntime *rt, JSPcInterruptHandler *cb,
+                              void *opaque) {
+  rt->pc_interrupt_handler = cb;
+  rt->pc_interrupt_opaque = opaque;
 }
 
 void JS_SetCanBlock(JSRuntime *rt, BOOL can_block) {

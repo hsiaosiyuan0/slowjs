@@ -1400,8 +1400,8 @@ exception:
   return 0;
 }
 
-static JSValue js_array_sort(JSContext *ctx, JSValueConst this_val, int argc,
-                             JSValueConst *argv) {
+JSValue js_array_sort(JSContext *ctx, JSValueConst this_val, int argc,
+                      JSValueConst *argv) {
   struct array_sort_context asc = {ctx, 0, 0, argv[0]};
   JSValue obj = JS_UNDEFINED;
   ValueSlot *array = NULL;

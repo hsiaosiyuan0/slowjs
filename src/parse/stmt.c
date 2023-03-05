@@ -18,6 +18,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
   int label_next, label_expr, label_cont, label_body, label_break;
   int pos_next, pos_expr;
   BlockEnv break_entry;
+  uint64_t loc = 0;
 
   has_initializer = FALSE;
   has_destructuring = FALSE;
@@ -68,6 +69,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
       }
       var_name = JS_ATOM_NULL;
     } else {
+      loc = LOC(s->token.line_num, s->token.col_num);
       var_name = JS_DupAtom(ctx, s->token.u.ident.atom);
       if (next_token(s)) {
         JS_FreeAtom(s->ctx, var_name);
@@ -77,6 +79,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
         JS_FreeAtom(s->ctx, var_name);
         return -1;
       }
+      s->loc = loc;
       emit_op(s, (tok == TOK_CONST || tok == TOK_LET) ? OP_scope_put_var_init
                                                       : OP_scope_put_var);
       emit_atom(s, var_name);
@@ -145,6 +148,9 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
   }
   if (next_token(s))
     return -1;
+
+  // col_num of token after `in` or `of`
+  loc = LOC(s->token.line_num, s->token.col_num);
   if (is_for_of) {
     if (js_parse_assign_expr(s))
       return -1;
@@ -207,12 +213,15 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
       /* get the result of the promise */
       emit_op(s, OP_await);
       /* unwrap the value and done values */
+      s->loc = loc;
       emit_op(s, OP_iterator_get_value_done);
     } else {
+      s->loc = loc;
       emit_op(s, OP_for_of_next);
       emit_u8(s, 0);
     }
   } else {
+    s->loc = loc;
     emit_op(s, OP_for_in_next);
   }
   /* on stack: enum_rec / enum_obj value bool */
@@ -244,6 +253,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
   JSContext *ctx = s->ctx;
   JSAtom label_name;
   int tok;
+  uint64_t loc = 0;
 
   /* specific label handling */
   /* XXX: support multiple labels on loop statements */
@@ -297,13 +307,16 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
       js_parse_error(s, "return not in a function");
       goto fail;
     }
+    loc = LOC(s->token.line_num, s->token.col_num);
     if (next_token(s))
       goto fail;
     if (s->token.val != ';' && s->token.val != '}' && !s->got_lf) {
       if (js_parse_expr(s))
         goto fail;
+      s->loc = loc;
       emit_return(s, TRUE);
     } else {
+      s->loc = loc;
       emit_return(s, FALSE);
     }
     if (js_parse_expect_semi(s))
@@ -387,8 +400,16 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
     set_eval_ret_undefined(s);
 
     emit_label(s, label_cont);
-    if (js_parse_expr_paren(s))
+
+    if (js_parse_expect(s, '('))
       goto fail;
+    loc = LOC(s->token.line_num, s->token.col_num);
+    if (js_parse_expr(s))
+      goto fail;
+    if (js_parse_expect(s, ')'))
+      goto fail;
+
+    s->loc = loc;
     emit_goto(s, OP_if_false, label_break);
 
     if (js_parse_statement(s))
@@ -423,13 +444,21 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
     emit_label(s, label_cont);
     if (js_parse_expect(s, TOK_WHILE))
       goto fail;
-    if (js_parse_expr_paren(s))
+
+    if (js_parse_expect(s, '('))
       goto fail;
+    loc = LOC(s->token.line_num, s->token.col_num);
+    if (js_parse_expr(s))
+      goto fail;
+    if (js_parse_expect(s, ')'))
+      goto fail;
+
     /* Insert semicolon if missing */
     if (s->token.val == ';') {
       if (next_token(s))
         goto fail;
     }
+    s->loc = loc;
     emit_goto(s, OP_if_true, label1);
 
     emit_label(s, label_break);
@@ -517,8 +546,10 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
       label_test = label_body;
     } else {
       emit_label(s, label_test);
+      loc = LOC(s->token.line_num, s->token.col_num);
       if (js_parse_expr(s))
         goto fail;
+      s->loc = loc;
       emit_goto(s, OP_if_false, label_break);
     }
     if (js_parse_expect(s, ';'))
@@ -534,6 +565,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
 
       pos_cont = s->cur_func->byte_code.size;
       emit_label(s, label_cont);
+      s->loc = loc = LOC(s->token.line_num, s->token.col_num);
       if (js_parse_expr(s))
         goto fail;
       emit_op(s, OP_drop);
@@ -583,6 +615,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
     int is_cont = s->token.val - TOK_BREAK;
     int label;
 
+    loc = LOC(s->token.line_num, s->token.col_num);
     if (next_token(s))
       goto fail;
     if (!s->got_lf && s->token.val == TOK_IDENT &&
@@ -590,6 +623,7 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
       label = s->token.u.ident.atom;
     else
       label = JS_ATOM_NULL;
+    s->loc = loc;
     if (emit_break(s, label, is_cont))
       goto fail;
     if (label != JS_ATOM_NULL) {
@@ -943,6 +977,9 @@ __exception int js_parse_statement_or_decl(JSParseState *s, int decl_mask) {
 
   default:
   hasexpr:
+    // emit `col_num` for exprStmt which does have internal col_num for the
+    // bytecode, otherwise will be omitted in later process
+    s->loc = LOC(s->token.line_num, s->token.col_num);
     if (js_parse_expr(s))
       goto fail;
     if (s->cur_func->eval_ret_idx >= 0) {

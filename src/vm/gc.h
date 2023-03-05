@@ -38,6 +38,7 @@ void set_cycle_flag(JSContext *ctx, JSValueConst obj);
 void add_gc_object(JSRuntime *rt, JSGCObjectHeader *h, JSGCObjectTypeEnum type);
 void remove_gc_object(JSGCObjectHeader *h);
 void free_gc_object(JSRuntime *rt, JSGCObjectHeader *gp);
+void gc_decref(JSRuntime *rt);
 
 void free_var_ref(JSRuntime *rt, JSVarRef *var_ref);
 void free_bytecode_atoms(JSRuntime *rt, const uint8_t *bc_buf, int bc_len,

@@ -1185,9 +1185,6 @@ JSFunctionDef *js_new_function_def(JSContext *ctx, JSFunctionDef *parent,
   fd->line_num = line_num;
 
   js_dbuf_init(ctx, &fd->pc2line);
-  // fd->pc2line_last_line_num = line_num;
-  // fd->pc2line_last_pc = 0;
-  fd->last_opcode_line_num = line_num;
 
   return fd;
 }
@@ -1208,7 +1205,7 @@ void js_free_function_def(JSContext *ctx, JSFunctionDef *fd) {
   dbuf_free(&fd->byte_code);
   js_free(ctx, fd->jump_slots);
   js_free(ctx, fd->label_slots);
-  js_free(ctx, fd->line_number_slots);
+  js_free(ctx, fd->loc_slots);
 
   for (i = 0; i < fd->cpool_count; i++) {
     JS_FreeValue(ctx, fd->cpool[i]);
@@ -1361,6 +1358,13 @@ JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd) {
   }
 #endif
 
+  // phase2:
+  // 1. remove `nop`
+  // 2. process the bytecode which used to manipulate the variables, eg:
+  //    - according `enter_scope` and `leave_scope` to do the variable
+  //    resolution
+  //      and remove them out from the bytecode stream flows to the next phase
+  //    - turn `scope_get_var` to the actual bytecode
   if (resolve_variables(ctx, fd))
     goto fail;
 
@@ -1375,6 +1379,8 @@ JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd) {
   }
 #endif
 
+  // phase3:
+  // 1. process `line_num`
   if (resolve_labels(ctx, fd))
     goto fail;
 

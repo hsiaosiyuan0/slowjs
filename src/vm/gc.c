@@ -461,7 +461,7 @@ static void gc_decref_child(JSRuntime *rt, JSGCObjectHeader *p) {
   }
 }
 
-static void gc_decref(JSRuntime *rt) {
+void gc_decref(JSRuntime *rt) {
   struct list_head *el, *el1;
   JSGCObjectHeader *p;
 

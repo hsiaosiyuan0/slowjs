@@ -590,6 +590,8 @@ int find_line_num(JSContext *ctx, JSFunctionBytecode *b, uint32_t pc_value) {
     if (pc_value < pc)
       return line_num;
     line_num = new_line_num;
+    // read `col_num`
+    get_sleb128(&v, p, p_end);
   }
   return line_num;
 }

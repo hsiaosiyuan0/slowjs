@@ -49,7 +49,11 @@ JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 #include "instrdef.h"
     [ OP_COUNT ... 255 ] = &&case_default
   };
-#define SWITCH(pc)    goto *dispatch_table[opcode = *pc++];
+#define SWITCH(pc)    do {                                      \
+                          if (js_pc_interrupts(pc, caller_ctx)) \
+                            return JS_EXCEPTION;                \
+                        goto *dispatch_table[opcode = *pc++];   \
+                      } while(0);
 #define CASE(op)    case_ ## op
 #define DEFAULT     case_default
 #define BREAK       SWITCH(pc)

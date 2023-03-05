@@ -20,33 +20,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v10
-        with:
-          vcpkgGitCommitId: 37fce29a263a1546262eaed6af7ccac53b0094cd
-
-      - name: Run Tests in Debug mode
+      - name: debug:run-tests
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "ci:tests"
-          buildPreset: "ci:tests"
+          configurePreset: "default"
+          buildPreset: "run-tests"
 
-      - name: Run Tests in Release mode
+      - name: release:run-tests
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "ci:tests"
+          configurePreset: "default"
           configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
-          buildPreset: "ci:tests"
+          buildPreset: "run-tests"
 
-      - name: Run test build boost in debug mode
+      - name: debug:test-col
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "ci:boost"
-          buildPreset: "ci:boost"
+          configurePreset: "dump-token"
+          buildPreset: "test-col"
 
-      - name: Run test build boost in release mode
+      - name: release:test-col
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "ci:boost"
+          configurePreset: "dump-token"
           configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
-          buildPreset: "ci:boost"
+          buildPreset: "test-col"
+
+      - name: debug:test-op_loc
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "dump-bytecode-2"
+          buildPreset: "test-op_loc"
+
+      - name: release:test-op_loc
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "dump-bytecode-2"
+          configurePresetAdditionalArgs: "['-DCMAKE_BUILD_TYPE=Release']"
+          buildPreset: "test-op_loc"

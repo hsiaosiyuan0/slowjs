@@ -21,9 +21,9 @@ endif()
 # force the `LTO` to keep the unused functions for exporting them to c modules
 target_link_options(quickjs PUBLIC -rdynamic)
 
-option(QJS_CONFIG_DEBUGGER "Enable debugger support" OFF)
-if(QJS_CONFIG_DEBUGGER)
-  target_compile_definitions(quickjs PUBLIC CONFIG_DEBUGGER=y)
+option(QJS_DUMP_TOKEN "Dump token while parsing" OFF)
+if(QJS_DUMP_TOKEN)
+  target_compile_definitions(quickjs PUBLIC DUMP_TOKEN=y)
 endif()
 
 set(QJS_DUMP_BYTECODE_HELP
@@ -37,6 +37,10 @@ set(QJS_DUMP_BYTECODE_HELP
 option(QJS_DUMP_BYTECODE ${QJS_DUMP_BYTECODE_HELP} OFF)
 if(QJS_DUMP_BYTECODE)
   target_compile_definitions(quickjs PUBLIC DUMP_BYTECODE=${QJS_DUMP_BYTECODE})
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  target_compile_definitions(quickjs PRIVATE DUMP_LEAKS=1)
 endif()
 
 target_compile_options(

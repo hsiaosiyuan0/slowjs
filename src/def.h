@@ -5,6 +5,11 @@
 #include <fenv.h>
 #include <inttypes.h>
 #include <math.h>
+#if defined(__APPLE__)
+#include <dispatch/dispatch.h>
+#else
+#include <semaphore.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -153,6 +158,9 @@ struct JSRuntime {
   JSInterruptHandler *interrupt_handler;
   void *interrupt_opaque;
 
+  JSPcInterruptHandler *pc_interrupt_handler;
+  void *pc_interrupt_opaque;
+
   JSHostPromiseRejectionTracker *host_promise_rejection_tracker;
   void *host_promise_rejection_tracker_opaque;
 
@@ -178,6 +186,9 @@ struct JSRuntime {
   JSNumericOperations bigdecimal_ops;
   uint32_t operator_count;
 #endif
+
+  BOOL debug;
+
   void *user_opaque;
 };
 
@@ -231,7 +242,7 @@ typedef struct JSVarRef {
 
       /* 0 : the JSVarRef is on the stack. header.link is an element
          of JSStackFrame.var_ref_list.
-         1 : the JSVarRef is detached. header.link has the normal meanning
+         1 : the JSVarRef is detached. header.link has the normal meaning
       */
       uint8_t is_detached : 1;
       uint8_t is_arg : 1;
@@ -251,6 +262,13 @@ typedef struct JSFloatEnv {
   unsigned int status;
 } JSFloatEnv;
 #endif
+
+typedef struct JSBreakpoint {
+  struct list_head link;
+  JSAtom file;
+  int line;
+  int col;
+} JSBreakpoint;
 
 struct JSContext {
   JSGCObjectHeader header; /* must come first */
@@ -298,6 +316,19 @@ struct JSContext {
   JSValue (*eval_internal)(JSContext *ctx, JSValueConst this_obj,
                            const char *input, size_t input_len,
                            const char *filename, int flags, int scope_idx);
+
+  struct {
+#if defined(__APPLE__)
+    dispatch_semaphore_t ready2start;
+#else
+    sem_t ready2start;
+#endif
+    pthread_mutex_t bp_mutex;
+    pthread_cond_t bp_cond;
+    BOOL paused;
+    struct list_head bps;
+  } debug;
+
   void *user_opaque;
 };
 

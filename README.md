@@ -1,24 +1,10 @@
+## SlowJS
+
+Learning the awesome [QuickJS](https://github.com/bellard/quickjs), QuickJS is quick but I'll make it slow
+
 ## Development
 
-First of all, you need to create a directory in project root directory to handle the building stuffs:
-
-```bash
-mkdir build
-```
-
-### Setup vcpkg
-
-First, install vcpkg by following its [official tutorial](https://vcpkg.io/en/getting-started.html)
-
-then run below command to integrate vcpkg with cmake:
-
-```bash
-cmake -B build -S . -G Ninja -D CMAKE_TOOLCHAIN_FILE=$(dirname `which vcpkg`)/scripts/buildsystems/vcpkg.cmake
-```
-
-### Building
-
-Before you perform the actual build it's better to glance over the available options:
+It's better to glance over the available options before you perform the actual build:
 
 ```bash
 cmake -B build -LH
@@ -28,50 +14,50 @@ cmake -B build -LH
 > - `-L` stands for listing all the options
 > - `-H` stands for printing the help messages along with the options
 
-above command will print the available options and their help message, use them like this:
+above command will print the available options and their help messages, use them like this:
 
 ```bash
 cmake -B build -S . -G Ninja -D QJS_DUMP_BYTECODE=1
 ```
 
 > - `-S` stands for the source directory
-> - `-D` stands for defining the options in a `key=value` pattern
+> - `-D` stands for specifying an options in a `key=value` pattern
 
 then choose one of below sections to run in project root directory
 
 #### Debug build
 
 ```bash
-cmake -B build -S . -G Ninja
-cmake --build build
+cmake -S . --preset=default
+cmake --build --preset=qjs
 ```
 
 #### Release build
 
 ```bash
-cmake -B build -S . -G Ninja -D CMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake -S . --preset=default -D CMAKE_BUILD_TYPE=Release
+cmake --build --preset=qjs
 ```
 
 #### Tests
 
 ```bash
-cmake -B build -S . -G Ninja
-cmake --build build --target run-tests
+cmake -S . --preset=default
+cmake --build --preset=run-tests
 ```
 
 #### Microbench
 
 ```bash
-cmake -B build -S . -G Ninja -D CMAKE_BUILD_TYPE=Release
-cmake --build build --target microbench
+cmake -S . --preset=default -D CMAKE_BUILD_TYPE=Release
+cmake --build --preset=run-microbench
 ```
 
 #### Test262
 
 ```bash
-cmake -B build -S . -G Ninja -D CMAKE_BUILD_TYPE=Release
-cmake --build build --target run-test262-test2
+cmake -S . --preset=default -D CMAKE_BUILD_TYPE=Release
+cmake --build --preset=run-test262
 
 # Result: 302/75790 errors, 1396 excluded, 7712 skipped, 302 new
 ```
@@ -81,9 +67,9 @@ cmake --build build --target run-test262-test2
 You can also choose the presets listed in `CMakePresets.json` to run:
 
 ```bash
-# Tell cmake to config used by building tools
-cmake -S . --preset=default 
+# Use a config preset
+cmake -S . --preset=default
 
 # Use a build preset
-cmake --build --preset=run-tests 
+cmake --build --preset=run-tests
 ```

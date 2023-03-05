@@ -34,9 +34,7 @@ enum OPCodeEnum {
 };
 
 typedef struct JSOpCode {
-#ifdef DUMP_BYTECODE
   const char *name;
-#endif
   uint8_t size; /* in bytes */
   /* the opcodes remove n_pop items from the top of the stack, then
      pushes n_push items */
@@ -47,11 +45,7 @@ typedef struct JSOpCode {
 
 static const JSOpCode opcode_info[OP_COUNT + (OP_TEMP_END - OP_TEMP_START)] = {
 #define FMT(f)
-#ifdef DUMP_BYTECODE
 #define DEF(id, size, n_pop, n_push, f) {#id, size, n_pop, n_push, OP_FMT_##f},
-#else
-#define DEF(id, size, n_pop, n_push, f) {size, n_pop, n_push, OP_FMT_##f},
-#endif
 #include "instrdef.h"
 #undef DEF
 #undef FMT

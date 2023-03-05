@@ -6,10 +6,13 @@ void js_parse_init(JSContext *ctx, JSParseState *s, const char *input,
   s->ctx = ctx;
   s->filename = filename;
   s->line_num = 1;
+  s->col_num = 1;
   s->buf_ptr = (const uint8_t *)input;
   s->buf_end = s->buf_ptr + input_len;
   s->token.val = ' ';
   s->token.line_num = 1;
+  s->token.col_num = 1;
+  s->loc = 0;
 }
 
 __exception int js_parse_program(JSParseState *s) {

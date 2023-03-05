@@ -1,6 +1,7 @@
 #include "bc.h"
 
 #include "intrins/intrins.h"
+#include "libs/cutils.h"
 #include "utils/dbuf.h"
 #include "vm/class.h"
 #include "vm/conv.h"
@@ -234,6 +235,9 @@ static void bc_byte_swap(uint8_t *bc_buf, int bc_len) {
     case OP_FMT_atom:
     case OP_FMT_atom_u8:
       put_u32(bc_buf + pos + 1, bswap32(get_u32(bc_buf + pos + 1)));
+      break;
+    case OP_FMT_u64:
+      put_u64(bc_buf + pos + 1, bswap32(get_u64(bc_buf + pos + 1)));
       break;
     case OP_FMT_atom_u16:
     case OP_FMT_label_u16:

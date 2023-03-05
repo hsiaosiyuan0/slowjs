@@ -37,6 +37,7 @@ __exception int js_parse_assign_expr2(JSParseState *s, int parse_flags) {
   int opcode, op, scope;
   JSAtom name0 = JS_ATOM_NULL;
   JSAtom name;
+  uint64_t loc = LOC(s->token.line_num, s->token.col_num);
 
   if (s->token.val == TOK_YIELD) {
     BOOL is_star = FALSE, is_async;
@@ -189,6 +190,9 @@ __exception int js_parse_assign_expr2(JSParseState *s, int parse_flags) {
     int label;
     if (next_token(s))
       return -1;
+
+    // col_num of token after `=`
+    loc = LOC(s->token.line_num, s->token.col_num);
     if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, (op != '='), op) <
         0)
       return -1;
@@ -220,6 +224,7 @@ __exception int js_parse_assign_expr2(JSParseState *s, int parse_flags) {
 #endif
       emit_op(s, op);
     }
+    s->loc = loc;
     put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_TOP, FALSE);
   } else if (op >= TOK_LAND_ASSIGN && op <= TOK_DOUBLE_QUESTION_MARK_ASSIGN) {
     int label, label1, depth_lvalue, label2;
@@ -549,6 +554,7 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
   FuncCallType call_type;
   int optional_chaining_label;
   BOOL accept_lparen = (parse_flags & PF_POSTFIX_CALL) != 0;
+  uint64_t loc = LOC(s->token.line_num, s->token.col_num);
 
   call_type = FUNC_CALL_NORMAL;
   switch (s->token.val) {
@@ -859,10 +865,11 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
       goto parse_func_call2;
     } else if (s->token.val == '(' && accept_lparen) {
       int opcode, arg_count, drop_count;
+      loc = LOC(s->token.line_num, s->token.col_num);
 
       /* function call */
     parse_func_call:
-      if (next_token(s))
+      if (next_token(s)) // consume `(`
         return -1;
 
       if (call_type == FUNC_CALL_NORMAL) {
@@ -1070,6 +1077,7 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
         case OP_scope_get_private_field:
         case OP_get_array_el:
         case OP_scope_get_ref:
+          s->loc = loc;
           emit_op(s, OP_call_method);
           emit_u16(s, arg_count);
           break;
@@ -1092,9 +1100,11 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
 
             emit_class_field_init(s);
           } else if (call_type == FUNC_CALL_NEW) {
+            s->loc = loc;
             emit_op(s, OP_call_constructor);
             emit_u16(s, arg_count);
           } else {
+            s->loc = loc;
             emit_op(s, OP_call);
             emit_u16(s, arg_count);
           }
@@ -1102,9 +1112,12 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
         }
       }
       call_type = FUNC_CALL_NORMAL;
-    } else if (s->token.val == '.') {
+    } /* if (s->token.val == '(' && accept_lparen) */
+    else if (s->token.val == '.') {
       if (next_token(s))
         return -1;
+      // save col_num after `.`
+      loc = LOC(s->token.line_num, s->token.col_num);
     parse_property:
       if (s->token.val == TOK_PRIVATE_NAME) {
         /* private class field */
@@ -1114,6 +1127,7 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
         if (has_optional_chain) {
           optional_chain_test(s, &optional_chaining_label, 1);
         }
+        s->loc = loc;
         emit_op(s, OP_scope_get_private_field);
         emit_atom(s, s->token.u.ident.atom);
         emit_u16(s, s->cur_func->scope_level);
@@ -1134,6 +1148,7 @@ __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
           if (has_optional_chain) {
             optional_chain_test(s, &optional_chaining_label, 1);
           }
+          s->loc = loc;
           emit_op(s, OP_get_field);
           emit_atom(s, s->token.u.ident.atom);
         }

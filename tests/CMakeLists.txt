@@ -59,5 +59,16 @@ add_custom_target(
   DEPENDS qjs
   JOB_POOL console)
 
+add_custom_target(
+  test-col
+  COMMAND ${QJS} "${PROJECT_SOURCE_DIR}/tests/test-col/run-tests.js"
+  DEPENDS qjs
+  JOB_POOL console)
+
+add_custom_target(
+  test-op_loc
+  COMMAND ${QJS} "${PROJECT_SOURCE_DIR}/tests/test-op_loc/run-tests.js"
+  DEPENDS qjs
+  JOB_POOL console)
+
 add_subdirectory(run-test262)
-add_subdirectory(http EXCLUDE_FROM_ALL)

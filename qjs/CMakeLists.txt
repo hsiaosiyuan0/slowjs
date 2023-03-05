@@ -1,15 +1,7 @@
-set(QJS_SOURCES qjs.c "${CMAKE_CURRENT_SOURCE_DIR}/repl.c")
-if(QJS_CONFIG_DEBUGGER)
-  set_source_files_properties(${QJS_SOURCES} PROPERTIES LANGUAGE CXX)
-  find_package(Boost REQUIRED)
-endif()
+set(QJS_SOURCES qjs.c debug.c "${CMAKE_CURRENT_SOURCE_DIR}/repl.c")
 
 add_executable(qjs ${QJS_SOURCES})
 target_link_libraries(qjs quickjs)
-
-if(QJS_CONFIG_DEBUGGER)
-  set_property(TARGET qjs PROPERTY CXX_STANDARD 20)
-endif()
 
 execute_process(
   COMMAND cat "${PROJECT_SOURCE_DIR}/VERSION"
@@ -31,10 +23,6 @@ add_custom_command(
   DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/repl.js")
 
 if(QJS_CONFIG_BIGNUM)
-  if(QJS_CONFIG_DEBUGGER)
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.c"
-                                PROPERTIES LANGUAGE CXX)
-  endif()
   target_sources(qjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/qjscalc.c")
 
   add_custom_command(

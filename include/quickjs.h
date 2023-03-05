@@ -827,6 +827,10 @@ void JS_SetHostPromiseRejectionTracker(JSRuntime *rt,
 typedef int JSInterruptHandler(JSRuntime *rt, void *opaque);
 void JS_SetInterruptHandler(JSRuntime *rt, JSInterruptHandler *cb,
                             void *opaque);
+
+typedef int JSPcInterruptHandler(const uint8_t *pc, JSRuntime *rt,
+                                 void *opaque);
+
 /* if can_block is TRUE, Atomics.wait() can be used */
 void JS_SetCanBlock(JSRuntime *rt, JS_BOOL can_block);
 /* set the [IsHTMLDDA] internal slot */
@@ -1084,6 +1088,34 @@ int JS_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
                        JSValue val);
 int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
                            const JSCFunctionListEntry *tab, int len);
+
+/* Debugger */
+
+int js_debug_init(JSContext *ctx);
+void js_debug_wait_ready2start(JSContext *ctx);
+void js_debug_ready2start(JSContext *ctx);
+
+void js_debug_on(JSContext *ctx);
+void js_debug_off(JSContext *ctx);
+void js_free_debug(JSContext *ctx);
+
+int js_debug_set_breakpoint(JSContext *ctx, const char *file, int line,
+                            int col);
+int js_debug_del_breakpoint(JSContext *ctx, const char *file, int line,
+                            int col);
+void js_debug_continue(JSContext *ctx);
+
+JSValue js_debug_list_stackframes(JSContext *ctx);
+
+// list all the available breakpoints of currently paused function
+// Note: only use this method when vm is paused by breakpoint hit
+JSValue js_debug_list_breakpoints(JSContext *ctx);
+
+// list the args, vars and var_refs in the stackframe specified by the
+// parameter `int i` which is the number offset from the topmost stackframe
+//
+// only use this method when vm is paused by breakpoint hit
+JSValue js_debug_dump_stackframe(JSContext *ctx, int i);
 
 #undef js_unlikely
 #undef js_force_inline

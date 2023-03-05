@@ -1,12 +1,15 @@
 #include "dump.h"
 
 #include "class.h"
+#include "def.h"
 #include "func.h"
 #include "intrins/intrins.h"
 #include "num.h"
 #include "obj.h"
+#include "parse/parse.h"
 #include "shape.h"
 #include "str.h"
+#include "utils/dbuf.h"
 
 __maybe_unused void JS_DumpString(JSRuntime *rt, const JSString *p) {
   int i, c, sep;
@@ -394,8 +397,8 @@ void dump_byte_code(JSContext *ctx, int pass, const uint8_t *tab, int len,
     if (source) {
       if (b) {
         line1 = find_line_num(ctx, b, pos) - line_num + 1;
-      } else if (op == OP_line_num) {
-        line1 = get_u32(tab + pos + 1) - line_num + 1;
+      } else if (op == OP_loc) {
+        line1 = get_u64(tab + pos + 1) - line_num + 1;
       }
       if (line1 > line) {
         if (!in_source)
@@ -471,6 +474,14 @@ void dump_byte_code(JSContext *ctx, int pass, const uint8_t *tab, int len,
       break;
     case OP_FMT_u32:
       printf(" %u", get_u32(tab + pos));
+      break;
+    case OP_FMT_u64:
+      if (op == OP_loc) {
+        uint64_t loc = get_u64(tab + pos);
+        printf(" %u:%u", LOC_LINE(loc), LOC_COL(loc));
+      } else {
+        printf(" %llu", get_u64(tab + pos));
+      }
       break;
 #if SHORT_OPCODES
     case OP_FMT_label8:
@@ -597,9 +608,11 @@ void dump_byte_code(JSContext *ctx, int pass, const uint8_t *tab, int len,
 
 __maybe_unused void dump_pc2line(JSContext *ctx, const uint8_t *buf, int len,
                                  int line_num) {
-  const uint8_t *p_end, *p_next, *p;
-  int pc, v;
+  const uint8_t *p_end, *p;
+  int pc, leb_len;
   unsigned int op;
+  uint32_t pos;
+  int32_t line, col;
 
   if (len <= 0)
     return;
@@ -611,31 +624,36 @@ __maybe_unused void dump_pc2line(JSContext *ctx, const uint8_t *buf, int len,
   pc = 0;
   while (p < p_end) {
     op = *p++;
-    if (op == 0) {
-      v = unicode_from_utf8(p, p_end - p, &p_next);
-      if (v < 0)
-        goto fail;
-      pc += v;
-      p = p_next;
-      v = unicode_from_utf8(p, p_end - p, &p_next);
-      if (v < 0) {
+    if (op == 0) { /* longer encoding */
+      leb_len = get_leb128(&pos, p, p_end);
+      if (leb_len < 0) {
       fail:
         printf("invalid pc2line encode pos=%d\n", (int)(p - buf));
         return;
       }
-      if (!(v & 1)) {
-        v = v >> 1;
-      } else {
-        v = -(v >> 1) - 1;
+      p += leb_len;
+      pc += pos;
+
+      leb_len = get_sleb128(&line, p, p_end);
+      if (leb_len < 0) {
+        goto fail;
       }
-      line_num += v;
-      p = p_next;
+      p += leb_len;
+
+      line_num += line;
     } else {
       op -= PC2LINE_OP_FIRST;
       pc += (op / PC2LINE_RANGE);
       line_num += (op % PC2LINE_RANGE) + PC2LINE_BASE;
     }
-    printf("%5d %5d\n", pc, line_num);
+
+    leb_len = get_sleb128(&col, p, p_end);
+    if (leb_len < 0) {
+      goto fail;
+    }
+    p += leb_len;
+
+    printf("%5d %5d:%d\n", pc, line_num, col);
   }
 }
 

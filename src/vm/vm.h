@@ -95,6 +95,15 @@ static inline __exception int js_poll_interrupts(JSContext *ctx) {
   }
 }
 
+void JS_SetPCInterruptHandler(JSRuntime *rt, JSPcInterruptHandler *cb,
+                              void *opaque);
+static inline int js_pc_interrupts(const uint8_t *pc, JSContext *ctx) {
+  JSRuntime *rt = ctx->rt;
+  if (rt->pc_interrupt_handler)
+    return rt->pc_interrupt_handler(pc, rt, rt->pc_interrupt_opaque);
+  return 0;
+}
+
 #define FUNC_RET_AWAIT 0
 #define FUNC_RET_YIELD 1
 #define FUNC_RET_YIELD_STAR 2

@@ -52,6 +52,9 @@ void js_std_promise_rejection_tracker(JSContext *ctx, JSValueConst promise,
                                       void *opaque);
 void js_std_set_worker_new_context_func(JSContext *(*func)(JSRuntime *rt));
 
+JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
+                         JSValueConst *argv);
+
 #ifdef __cplusplus
 } /* extern "C" { */
 #endif

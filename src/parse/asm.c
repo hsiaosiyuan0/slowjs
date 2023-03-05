@@ -1,3 +1,4 @@
+#include "libs/cutils.h"
 #include "parse.h"
 
 BOOL js_is_live_code(JSParseState *s) {
@@ -37,14 +38,12 @@ void emit_op(JSParseState *s, uint8_t val) {
   JSFunctionDef *fd = s->cur_func;
   DynBuf *bc = &fd->byte_code;
 
-  /* Use the line number of the last token used, not the next token,
-     nor the current offset in the source file.
-   */
-  if (unlikely(fd->last_opcode_line_num != s->last_line_num)) {
-    dbuf_putc(bc, OP_line_num);
-    dbuf_put_u32(bc, s->last_line_num);
-    fd->last_opcode_line_num = s->last_line_num;
+  if (s->loc != 0) {
+    dbuf_putc(bc, OP_loc);
+    dbuf_put_u64(bc, s->loc);
+    s->loc = 0;
   }
+
   fd->last_opcode_pos = bc->size;
   dbuf_putc(bc, val);
 }
