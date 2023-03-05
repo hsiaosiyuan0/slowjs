@@ -5,7 +5,7 @@ SlowJS - QuickJS is quick but I can make it slow!
 Learning the awesome [QuickJS](https://github.com/bellard/quickjs) by extending it with below functionalities:
 
 - [x] Divide the 5.4W LoC file `quickjs.c` into multiple small files, which makes the code easy to browser and navigate
-- [x] A debugger which supports inline breakpoints and includes web interfaces which is easy to integrated with the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
+- [x] A debugger which supports inline breakpoints and includes web interfaces which is easy to integrate with the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
 - [ ] Dump the GC managed objects and view the results in the Chrome inspector
 
 ## Debugger
@@ -44,7 +44,7 @@ print(doSth(1, 2));
 3. Start the debugger:
 
 ```bash
-./build/qjs/qjs --debug 809
+./build/qjs/qjs --debug 8097
 ```
 
 3. Connect to the debugger:
