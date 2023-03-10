@@ -4,7 +4,7 @@ SlowJS - QuickJS is quick but I can make it slow!
 
 Learning the awesome [QuickJS](https://github.com/bellard/quickjs) by extending it with below functionalities:
 
-- [x] Divide the 5.4W LoC file `quickjs.c` into multiple small files, which makes the code easy to browser and navigate
+- [x] Divide the 5.4W LoC [quickjs.c](https://github.com/bellard/quickjs/blob/master/quickjs.c) into multiple small files, which makes the code easy to browser and navigate
 - [x] A debugger which supports inline breakpoints and includes web interfaces which is easy to integrate with the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
 - [ ] Dump the GC managed objects and view the results in the Chrome inspector
 
@@ -66,11 +66,17 @@ Paste above json into the `nc` REPL and press `ENTER`
 5. Set breakpoints:
 
 ```json
-{ "type": "setBreakpoint", "data": { "file": "./tmp_test.js", "line": 3, "col": 0 } }
+{
+  "type": "setBreakpoint",
+  "data": { "file": "./tmp_test.js", "line": 3, "col": 0 }
+}
 ```
 
 ```json
-{ "type": "setBreakpoint", "data": { "file": "./tmp_test.js", "line": 8, "col": 0 } }
+{
+  "type": "setBreakpoint",
+  "data": { "file": "./tmp_test.js", "line": 8, "col": 0 }
+}
 ```
 
 6. Star to run our test script:
@@ -119,7 +125,7 @@ the output looks like:
 9. Now the debugger is paused at the second breakpoint, we can print the variable in the topmost stack frame:
 
 ```json
-{ "type": "dumpStackframe", "data": { "i": 0 }  }
+{ "type": "dumpStackframe", "data": { "i": 0 } }
 ```
 
 the output looks like:
