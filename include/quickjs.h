@@ -347,7 +347,13 @@ void JS_FreeRuntime(JSRuntime *rt);
 void *JS_GetRuntimeOpaque(JSRuntime *rt);
 void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
 typedef void JS_MarkFunc(JSRuntime *rt, JSGCObjectHeader *gp);
+typedef struct JSProperty JSProperty;
+typedef struct JSShapeProperty JSShapeProperty;
+typedef void JS_WalkFunc(JSRuntime *rt, JSGCObjectHeader *gp,
+                         JSShapeProperty *prs, JSProperty *pr, void *uctx);
 void JS_MarkValue(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void JS_WalkValue(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                  JSShapeProperty *prs, JSProperty *pr, void *uctx);
 void JS_RunGC(JSRuntime *rt);
 JS_BOOL JS_IsLiveObject(JSRuntime *rt, JSValueConst obj);
 
@@ -478,6 +484,8 @@ typedef struct JSClassExoticMethods {
 typedef void JSClassFinalizer(JSRuntime *rt, JSValue val);
 typedef void JSClassGCMark(JSRuntime *rt, JSValueConst val,
                            JS_MarkFunc *mark_func);
+typedef void JSClassGCWalk(JSRuntime *rt, JSValueConst val,
+                           JS_WalkFunc *walk_func, void *uctx);
 #define JS_CALL_FLAG_CONSTRUCTOR (1 << 0)
 typedef JSValue JSClassCall(JSContext *ctx, JSValueConst func_obj,
                             JSValueConst this_val, int argc, JSValueConst *argv,
@@ -487,6 +495,7 @@ typedef struct JSClassDef {
   const char *class_name;
   JSClassFinalizer *finalizer;
   JSClassGCMark *gc_mark;
+  JSClassGCWalk *gc_walk;
   /* if call != NULL, the object is a function. If (flags &
      JS_CALL_FLAG_CONSTRUCTOR) != 0, the function is called as a
      constructor. In this case, 'this_val' is new.target. A

@@ -44,4 +44,7 @@ void free_var_ref(JSRuntime *rt, JSVarRef *var_ref);
 void free_bytecode_atoms(JSRuntime *rt, const uint8_t *bc_buf, int bc_len,
                          BOOL use_short_opcodes);
 
+JSValue js_dump_gc_objects(JSContext *ctx, JSValueConst this_val, int argc,
+                           JSValueConst *argv);
+
 #endif

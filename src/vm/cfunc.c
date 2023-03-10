@@ -64,6 +64,10 @@ void js_c_function_data_mark(JSRuntime *rt, JSValueConst val,
   }
 }
 
+// TODO:
+void js_c_function_data_walk(JSRuntime *rt, JSValueConst val,
+                             JS_WalkFunc *walk_func, void *uctx) {}
+
 JSValue js_c_function_data_call(JSContext *ctx, JSValueConst func_obj,
                                 JSValueConst this_val, int argc,
                                 JSValueConst *argv, int flags) {

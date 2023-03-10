@@ -36,6 +36,10 @@ void js_generator_mark(JSRuntime *rt, JSValueConst val,
   async_func_mark(rt, &s->func_state, mark_func);
 }
 
+// TODO:
+void js_generator_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                       void *uctx) {}
+
 /* XXX: use enum */
 #define GEN_MAGIC_NEXT 0
 #define GEN_MAGIC_RETURN 1

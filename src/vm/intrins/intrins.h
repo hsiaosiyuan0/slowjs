@@ -257,6 +257,8 @@ void js_regexp_finalizer(JSRuntime *rt, JSValue val);
 void js_regexp_string_iterator_finalizer(JSRuntime *rt, JSValue val);
 void js_regexp_string_iterator_mark(JSRuntime *rt, JSValueConst val,
                                     JS_MarkFunc *mark_func);
+void js_regexp_string_iterator_walk(JSRuntime *rt, JSValueConst val,
+                                    JS_WalkFunc *walk_func, void *uctx);
 
 /* -- JSON ----------------------------------- */
 
@@ -319,6 +321,8 @@ typedef struct JSMapState {
 
 void js_map_finalizer(JSRuntime *rt, JSValue val);
 void js_map_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void js_map_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                 void *uctx);
 
 /* Map Iterator */
 
@@ -331,6 +335,8 @@ typedef struct JSMapIteratorData {
 void js_map_iterator_finalizer(JSRuntime *rt, JSValue val);
 void js_map_iterator_mark(JSRuntime *rt, JSValueConst val,
                           JS_MarkFunc *mark_func);
+void js_map_iterator_walk(JSRuntime *rt, JSValueConst val,
+                          JS_WalkFunc *walk_func, void *uctx);
 
 void JS_AddIntrinsicMapSet(JSContext *ctx);
 
@@ -362,6 +368,8 @@ JSValue js_generator_function_call(JSContext *ctx, JSValueConst func_obj,
                                    JSValueConst *argv, int flags);
 void js_generator_finalizer(JSRuntime *rt, JSValue obj);
 void js_generator_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void js_generator_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                       void *uctx);
 
 /* -- Promise ----------------------------------- */
 

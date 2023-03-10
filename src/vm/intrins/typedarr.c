@@ -2029,6 +2029,10 @@ void js_typed_array_mark(JSRuntime *rt, JSValueConst val,
   }
 }
 
+// TODO:
+void js_typed_array_walk(JSRuntime *rt, JSValueConst val,
+                         JS_WalkFunc *walk_func, void *uctx) {}
+
 static JSValue js_dataview_constructor(JSContext *ctx, JSValueConst new_target,
                                        int argc, JSValueConst *argv) {
   JSArrayBuffer *abuf;

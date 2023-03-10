@@ -255,7 +255,7 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx) {
     // clang-format off
     char const unscopables[] = "copyWithin" "\0" "entries" "\0" "fill" "\0" "find" "\0"
         "findIndex" "\0" "flat" "\0" "flatMap" "\0" "includes" "\0" "keys" "\0" "values" "\0";
-    // clang-format on 
+    // clang-format on
     const char *p = unscopables;
     obj1 = JS_NewObjectProto(ctx, JS_NULL);
     for (p = unscopables; *p; p += strlen(p) + 1) {
@@ -385,4 +385,3 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx) {
                          JS_DupValue(ctx, ctx->global_obj),
                          JS_PROP_CONFIGURABLE | JS_PROP_WRITABLE);
 }
-

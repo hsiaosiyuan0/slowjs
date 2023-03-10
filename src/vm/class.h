@@ -77,6 +77,7 @@ struct JSClass {
   JSAtom class_name;
   JSClassFinalizer *finalizer;
   JSClassGCMark *gc_mark;
+  JSClassGCWalk *gc_walk;
   JSClassCall *call;
   /* pointers for exotic behavior, can be NULL if none are present */
   const JSClassExoticMethods *exotic;
@@ -86,59 +87,109 @@ typedef struct JSClassShortDef {
   JSAtom class_name;
   JSClassFinalizer *finalizer;
   JSClassGCMark *gc_mark;
+  JSClassGCWalk *gc_walk;
 } JSClassShortDef;
 
 void js_array_finalizer(JSRuntime *rt, JSValue val);
 void js_array_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void js_array_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                   void *uctx);
+
 void js_object_data_finalizer(JSRuntime *rt, JSValue val);
 void js_object_data_mark(JSRuntime *rt, JSValueConst val,
                          JS_MarkFunc *mark_func);
+void js_object_data_walk(JSRuntime *rt, JSValueConst val,
+                         JS_WalkFunc *walk_func, void *uctx);
+
 void js_c_function_finalizer(JSRuntime *rt, JSValue val);
 void js_c_function_mark(JSRuntime *rt, JSValueConst val,
                         JS_MarkFunc *mark_func);
+void js_c_function_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                        void *uctx);
+
 void js_bytecode_function_finalizer(JSRuntime *rt, JSValue val);
 void js_bytecode_function_mark(JSRuntime *rt, JSValueConst val,
                                JS_MarkFunc *mark_func);
+void js_bytecode_function_walk(JSRuntime *rt, JSValueConst val,
+                               JS_WalkFunc *walk_func, void *uctx);
+
 void js_bound_function_finalizer(JSRuntime *rt, JSValue val);
 void js_bound_function_mark(JSRuntime *rt, JSValueConst val,
                             JS_MarkFunc *mark_func);
+void js_bound_function_walk(JSRuntime *rt, JSValueConst val,
+                            JS_WalkFunc *walk_func, void *uctx);
+
 void js_for_in_iterator_finalizer(JSRuntime *rt, JSValue val);
 void js_for_in_iterator_mark(JSRuntime *rt, JSValueConst val,
                              JS_MarkFunc *mark_func);
+void js_for_in_iterator_walk(JSRuntime *rt, JSValueConst val,
+                             JS_WalkFunc *walk_func, void *uctx);
+
 void js_c_function_data_finalizer(JSRuntime *rt, JSValue val);
 void js_c_function_data_mark(JSRuntime *rt, JSValueConst val,
                              JS_MarkFunc *mark_func);
+void js_c_function_data_walk(JSRuntime *rt, JSValueConst val,
+                             JS_WalkFunc *walk_func, void *uctx);
+
 void js_regexp_finalizer(JSRuntime *rt, JSValue val);
 void js_array_buffer_finalizer(JSRuntime *rt, JSValue val);
 void js_typed_array_finalizer(JSRuntime *rt, JSValue val);
 void js_typed_array_mark(JSRuntime *rt, JSValueConst val,
                          JS_MarkFunc *mark_func);
+void js_typed_array_walk(JSRuntime *rt, JSValueConst val,
+                         JS_WalkFunc *walk_func, void *uctx);
+
 void js_proxy_finalizer(JSRuntime *rt, JSValue val);
 void js_proxy_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void js_proxy_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                   void *uctx);
+
 void js_map_finalizer(JSRuntime *rt, JSValue val);
 void js_map_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void js_map_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                 void *uctx);
+
 void js_map_iterator_finalizer(JSRuntime *rt, JSValue val);
 void js_map_iterator_mark(JSRuntime *rt, JSValueConst val,
                           JS_MarkFunc *mark_func);
+void js_map_iterator_walk(JSRuntime *rt, JSValueConst val,
+                          JS_WalkFunc *walk_func, void *uctx);
+
 void js_array_iterator_finalizer(JSRuntime *rt, JSValue val);
 void js_array_iterator_mark(JSRuntime *rt, JSValueConst val,
                             JS_MarkFunc *mark_func);
+void js_array_iterator_walk(JSRuntime *rt, JSValueConst val,
+                            JS_WalkFunc *walk_func, void *uctx);
+
 void js_regexp_string_iterator_finalizer(JSRuntime *rt, JSValue val);
 void js_regexp_string_iterator_mark(JSRuntime *rt, JSValueConst val,
                                     JS_MarkFunc *mark_func);
+void js_regexp_string_iterator_walk(JSRuntime *rt, JSValueConst val,
+                                    JS_WalkFunc *walk_func, void *uctx);
+
 void js_generator_finalizer(JSRuntime *rt, JSValue obj);
 void js_generator_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void js_generator_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                       void *uctx);
+
 void js_promise_finalizer(JSRuntime *rt, JSValue val);
 void js_promise_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
+void js_promise_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                     void *uctx);
+
 void js_promise_resolve_function_finalizer(JSRuntime *rt, JSValue val);
 void js_promise_resolve_function_mark(JSRuntime *rt, JSValueConst val,
                                       JS_MarkFunc *mark_func);
+void js_promise_resolve_function_walk(JSRuntime *rt, JSValueConst val,
+                                      JS_WalkFunc *walk_func, void *uctx);
 #ifdef CONFIG_BIGNUM
 void js_float_env_finalizer(JSRuntime *rt, JSValue val);
 
 void js_operator_set_finalizer(JSRuntime *rt, JSValue val);
 void js_operator_set_mark(JSRuntime *rt, JSValueConst val,
                           JS_MarkFunc *mark_func);
+void js_operator_set_walk(JSRuntime *rt, JSValueConst val,
+                          JS_WalkFunc *walk_func, void *uctx);
 #endif
 
 #ifdef CONFIG_BIGNUM

@@ -24,6 +24,8 @@ void js_c_function_data_finalizer(JSRuntime *rt, JSValue val);
 
 void js_c_function_data_mark(JSRuntime *rt, JSValueConst val,
                              JS_MarkFunc *mark_func);
+void js_c_function_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                        void *uctx);
 
 JSValue js_c_function_data_call(JSContext *ctx, JSValueConst func_obj,
                                 JSValueConst this_val, int argc,

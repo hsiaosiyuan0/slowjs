@@ -23,6 +23,10 @@ void js_proxy_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func) {
   }
 }
 
+// TODO:
+void js_proxy_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                   void *uctx) {}
+
 JSValue JS_ThrowTypeErrorRevokedProxy(JSContext *ctx) {
   return JS_ThrowTypeError(ctx, "revoked proxy");
 }

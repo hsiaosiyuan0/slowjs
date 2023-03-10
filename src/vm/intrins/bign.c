@@ -68,6 +68,10 @@ void js_operator_set_mark(JSRuntime *rt, JSValueConst val,
   }
 }
 
+// TODO:
+void js_operator_set_walk(JSRuntime *rt, JSValueConst val,
+                          JS_WalkFunc *walk_func, void *uctx) {}
+
 /* create an OperatorSet object */
 static JSValue js_operators_create_internal(JSContext *ctx, int argc,
                                             JSValueConst *argv,

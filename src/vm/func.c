@@ -955,6 +955,10 @@ void async_func_mark(JSRuntime *rt, JSAsyncFunctionState *s,
   }
 }
 
+// TODO:
+void async_func_walk(JSRuntime *rt, JSAsyncFunctionState *s,
+                     JS_WalkFunc *walk_func, void *uctx) {}
+
 void async_func_free(JSRuntime *rt, JSAsyncFunctionState *s) {
   JSStackFrame *sf;
   JSValue *sp;

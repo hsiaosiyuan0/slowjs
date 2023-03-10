@@ -205,6 +205,10 @@ void js_promise_resolve_function_mark(JSRuntime *rt, JSValueConst val,
   }
 }
 
+// TODO:
+void js_promise_resolve_function_walk(JSRuntime *rt, JSValueConst val,
+                                      JS_WalkFunc *walk_func, void *uctx) {}
+
 static JSValue js_promise_resolve_function_call(JSContext *ctx,
                                                 JSValueConst func_obj,
                                                 JSValueConst this_val, int argc,
@@ -291,6 +295,10 @@ void js_promise_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func) {
   }
   JS_MarkValue(rt, s->promise_result, mark_func);
 }
+
+// TODO:
+void js_promise_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+                     void *uctx) {}
 
 static JSValue js_promise_constructor(JSContext *ctx, JSValueConst new_target,
                                       int argc, JSValueConst *argv) {
