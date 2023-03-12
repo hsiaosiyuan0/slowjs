@@ -16,6 +16,8 @@
 #include "utils/dbuf.h"
 #include "utils/kid.h"
 #include "vm/str.h"
+#include <stddef.h>
+#include <stdio.h>
 
 /* -- Malloc ----------------------------------- */
 
@@ -1424,7 +1426,7 @@ static void walk_children(JSRuntime *rt, JSGCObjectHeader *gp,
     JSShape *sh;
     int i;
     sh = p->shape;
-    walk_func(rt, &sh->header, NULL, NULL, uctx);
+    // walk_func(rt, &sh->header, NULL, NULL, uctx);
     /* mark all the fields */
     prs = get_shape_prop(sh);
     for (i = 0; i < sh->prop_count; i++) {
@@ -1501,14 +1503,6 @@ static void walk_children(JSRuntime *rt, JSGCObjectHeader *gp,
 
 /* -- GC dump ----------------------------------- */
 
-typedef struct js_gc_dump_node {
-  size_t id;
-  JSAtom name;
-  uint16_t type;
-  size_t self_size;
-  size_t edge_count;
-} js_gc_dump_node;
-
 // below types come from the v8's impl, maybe changed later
 enum {
   JS_GC_DUMP_EDGE_TYPE_CTX_VAR,  // A variable from a function context.
@@ -1552,11 +1546,19 @@ typedef struct js_gc_dump_edge {
   size_t to;
 } js_gc_dump_edge;
 
+typedef struct js_gc_dump_node {
+  size_t id;
+  JSAtom name;
+  uint16_t type;
+  size_t self_size;
+  KidArray edges; // Array<js_gc_dump_edge>
+} js_gc_dump_node;
+
 typedef struct js_gc_dump_ctx {
   JSContext *jc;
   KidAllocator kid_allocator;
   KidArray nodes;
-  KidArray edges;
+  size_t edges_len;
 
   KidArray strs;     // Array<JSString*>
   KidHashmap str2id; // Hashmap<JSString*, int>
@@ -1577,7 +1579,6 @@ js_gc_dump_ctx *js_dump_gc_new_ctx(JSContext *ctx) {
   kid_set_allocator(&dc->kid_allocator);
 
   kid_array_init(&dc->nodes, sizeof(js_gc_dump_node), 0);
-  kid_array_init(&dc->edges, sizeof(js_gc_dump_edge), 0);
 
   kid_array_init(&dc->strs, sizeof(JSAtom), 0);
   kid_hashmap_init(&dc->str2id, kid_hashmap_key_copy, kid_hashmap_key_free,
@@ -1604,17 +1605,19 @@ js_gc_dump_ctx *js_dump_gc_new_ctx(JSContext *ctx) {
 
 int js_dump_gc_node_from_gp(js_gc_dump_ctx *dc, JSGCObjectHeader *gp) {
   KidHashkey key;
-  key.opaque = gp;
+  key.opaque = &gp;
   key.size = sizeof(gp);
   key.hash = -1;
   KidHashmapEntry *e = kid_hashmap_get(&dc->obj2node, &key);
   if (e)
     return cast_void_ptr_int(e->value);
 
-  js_gc_dump_node item = {dc->nodes.len, 0, 0, 0};
+  js_gc_dump_node item = {dc->nodes.len, 0};
   int i = kid_array_push(&dc->nodes, &item);
   if (i < 0)
     return -1;
+  js_gc_dump_node *node = &kid_array(&dc->nodes, js_gc_dump_node)[i];
+  kid_array_init(&node->edges, sizeof(js_gc_dump_edge), 0);
 
   kid_hashmap_set(&dc->obj2node, &key, NULL, false);
   e = kid_hashmap_get(&dc->obj2node, &key);
@@ -1638,61 +1641,67 @@ int js_dump_gc_add_str(js_gc_dump_ctx *dc, JSAtom atom) {
 
 void js_dump_gc_process_obj(JSRuntime *rt, JSGCObjectHeader *gp,
                             JSShapeProperty *prs, JSProperty *pr, void *uctx) {
+
+  js_gc_dump_ctx *dc = uctx;
+  JSObject *objp = (JSObject *)(gp);
+
+  JSAtom atom = rt->class_array[objp->class_id].class_name;
+  char atom_buf[ATOM_GET_STR_BUF_SIZE];
+
+  KidHashkey key;
+  key.opaque = gp;
+  key.size = sizeof(gp);
+  key.hash = -1;
+  int node_i = js_dump_gc_node_from_gp(dc, gp);
+  js_gc_dump_node *nodes = kid_array(&dc->nodes, js_gc_dump_node);
+  js_gc_dump_node *node = &nodes[node_i];
+
+  printf("id: %d gc_typ: %d\n", node_i, gp->gc_obj_type);
+
   switch (gp->gc_obj_type) {
   case JS_GC_OBJ_TYPE_JS_OBJECT: {
-    JSObject *p = (JSObject *)(gp);
-    JSAtom atom = rt->class_array[p->class_id].class_name;
-    char atom_buf[ATOM_GET_STR_BUF_SIZE];
-    js_gc_dump_ctx *dc = uctx;
-    KidHashkey key;
-    key.opaque = gp;
-    key.size = sizeof(gp);
-    key.hash = -1;
-    int node_i = js_dump_gc_node_from_gp(dc, gp);
-    js_gc_dump_node *nodes = kid_array(&dc->nodes, js_gc_dump_node);
-    js_gc_dump_node *node = &nodes[node_i];
+
     if (!node->self_size) {
       node->self_size = 10;
-
       JSPropertyDescriptor desc;
       int res;
 
-      res = JS_GetOwnPropertyInternal(dc->jc, &desc, p, JS_ATOM_name);
+      res = JS_GetOwnPropertyInternal(dc->jc, &desc, objp, JS_ATOM_name);
       if (res > 0 && JS_IsString(desc.value)) {
         JSAtom atom = JS_NewAtomStr(dc->jc, JS_VALUE_GET_PTR(desc.value));
         node->name = js_dump_gc_add_str(dc, atom);
+        const char *pp = JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), atom);
+        printf("name: %s %d\n", pp, node->name);
         JS_FreeAtom(dc->jc, atom);
       }
     }
-    if (dc->parent > 0 && prs) {
-      js_gc_dump_node *pn = &nodes[dc->parent];
-      pn->self_size += 10;
 
-      js_gc_dump_edge edge;
-      pn->edge_count += 1;
-      edge.name_or_idx = prs->atom;
-      edge.type = __JS_AtomIsTaggedInt(edge.name_or_idx)
-                      ? JS_GC_DUMP_EDGE_TYPE_ELEM
-                      : JS_GC_DUMP_EDGE_TYPE_PROP;
-      if (edge.type == JS_GC_DUMP_EDGE_TYPE_PROP) {
-        edge.name_or_idx = js_dump_gc_add_str(dc, prs->atom);
-      }
-      edge.to = node_i * 5;
-      kid_array_push(&dc->edges, &edge);
-    }
-    if (prs && !__JS_AtomIsTaggedInt(prs->atom)) {
-      const char *pp =
-          JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), prs->atom);
-      printf("propname: %s\n", pp);
-    }
-
-    printf("[%s %p] id: %zu self_size: %zu\n",
-           JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), atom), (void *)p,
-           node->id, node->self_size);
+    // printf("[%s %p] id: %zu self_size: %zu\n",
+    //        JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), atom), (void *)p,
+    //        node->id, node->self_size);
     break;
   default:
     break;
   }
+  }
+
+  if (dc->parent >= 0 && prs) {
+    js_gc_dump_node *pn = &nodes[dc->parent];
+    pn->self_size += 10;
+
+    js_gc_dump_edge edge;
+    edge.name_or_idx = prs->atom;
+    edge.type = __JS_AtomIsTaggedInt(edge.name_or_idx)
+                    ? JS_GC_DUMP_EDGE_TYPE_ELEM
+                    : JS_GC_DUMP_EDGE_TYPE_PROP;
+    if (edge.type == JS_GC_DUMP_EDGE_TYPE_PROP) {
+      edge.name_or_idx = js_dump_gc_add_str(dc, prs->atom);
+    }
+    const char *pp = JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), prs->atom);
+    printf("--propname: %s %d\n", pp, edge.name_or_idx);
+    edge.to = node_i * 5;
+    kid_array_push(&pn->edges, &edge);
+    dc->edges_len++;
   }
 }
 
@@ -1705,7 +1714,7 @@ void js_dump_gc_write_nodes(FILE *fp, js_gc_dump_ctx *dc) {
   for (int i = 0, len = dc->nodes.len; i < len; i++) {
     js_gc_dump_node *node = &nodes[i];
     dbuf_printf(&dbuf, "%d,%d,%zu,%zu,%zu", node->type, node->name, node->id,
-                node->self_size, node->edge_count);
+                node->self_size, node->edges.len);
     if (i != len - 1)
       dbuf_putstr(&dbuf, ",\n");
     else
@@ -1717,17 +1726,21 @@ void js_dump_gc_write_nodes(FILE *fp, js_gc_dump_ctx *dc) {
 
 void js_dump_gc_write_edges(FILE *fp, js_gc_dump_ctx *dc) {
   DynBuf dbuf;
-  js_gc_dump_edge *edges = kid_array(&dc->edges, js_gc_dump_edge);
+  js_gc_dump_node *nodes = kid_array(&dc->nodes, js_gc_dump_node);
 
   js_dbuf_init(dc->jc, &dbuf);
+  for (int i = 0, len = dc->nodes.len, h = 0; i < len; i++) {
+    js_gc_dump_node *node = &nodes[i];
+    js_gc_dump_edge *edges = kid_array(&node->edges, js_gc_dump_edge);
 
-  for (int i = 0, len = dc->edges.len; i < len; i++) {
-    js_gc_dump_edge *edge = &edges[i];
-    dbuf_printf(&dbuf, "%d,%d,%zu", edge->type, edge->name_or_idx, edge->to);
-    if (i != len - 1)
-      dbuf_putstr(&dbuf, ",\n");
-    else
-      dbuf_putstr(&dbuf, "\n");
+    for (int j = 0, k = node->edges.len; j < k; j++, h++) {
+      js_gc_dump_edge *edge = &edges[j];
+      dbuf_printf(&dbuf, "%d,%d,%zu", edge->type, edge->name_or_idx, edge->to);
+      if (h != dc->edges_len - 1)
+        dbuf_putstr(&dbuf, ",\n");
+      else
+        dbuf_putstr(&dbuf, "\n");
+    }
   }
   fwrite(dbuf.buf, 1, dbuf.size, fp);
   dbuf_free(&dbuf);
@@ -1789,8 +1802,6 @@ void js_dump_gc_write2file(js_gc_dump_ctx *dc) {
   fprintf(fp, "        \"string\",\n");  
   fprintf(fp, "        \"number\",\n");  
   fprintf(fp, "        \"number\",\n");  
-  fprintf(fp, "        \"number\",\n");  
-  fprintf(fp, "        \"number\",\n");  
   fprintf(fp, "        \"number\"\n");  
   fprintf(fp, "      ],\n");                // node_types close
 
@@ -1817,7 +1828,7 @@ void js_dump_gc_write2file(js_gc_dump_ctx *dc) {
   fprintf(fp, "    },\n"); // meta close
 
   fprintf(fp, "    \"node_count\": %zu,\n", dc->nodes.len);
-  fprintf(fp, "    \"edge_count\": %zu\n", dc->edges.len);
+  fprintf(fp, "    \"edge_count\": %zu\n", dc->edges_len);
   fprintf(fp, "  },\n"); // snapshot close
 
   fprintf(fp, "  \"nodes\": [\n"); // nodes
@@ -1848,13 +1859,20 @@ void __js_dump_gc_objects(JSContext *ctx) {
     assert(node_i >= 0);
     js_dump_gc_process_obj(rt, gp, NULL, NULL, dc);
     dc->parent = node_i;
+    printf("---children of %d edges_ofst %zu\n", node_i, dc->edges_len);
     walk_children(rt, gp, js_dump_gc_process_obj, dc);
+    printf("---end children of %d\n\n", node_i);
     dc->parent = -1;
   }
 
   js_dump_gc_write2file(dc);
+
+  js_gc_dump_node *nodes = kid_array(&dc->nodes, js_gc_dump_node);
+  for (int i = 0, len = dc->nodes.len; i < len; i++) {
+    kid_array_free(&nodes[i].edges);
+  }
   kid_array_free(&dc->nodes);
-  kid_array_free(&dc->edges);
+
   kid_array_free(&dc->strs);
   kid_hashmap_free(&dc->str2id);
   kid_hashmap_free(&dc->obj2node);
