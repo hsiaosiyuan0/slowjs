@@ -26,8 +26,8 @@ void *kid_malloc(size_t size);
 /* -- String ----------------------------------- */
 
 typedef struct KidString {
-  size_t len;
   unsigned char *data;
+  size_t len;
 } KidString;
 
 KidString kid_string_from_cstr(const char *cstr);
@@ -44,6 +44,8 @@ typedef struct KidArray {
 int kid_array_init(KidArray *arr, size_t slot_size, size_t cap);
 void kid_array_free(KidArray *arr);
 int kid_array_push(KidArray *arr, void *item);
+
+#define kid_array(arr, typ) ((typ *)(arr)->slots)
 
 /* -- List ----------------------------------- */
 
@@ -132,8 +134,8 @@ struct KidHashmapEntry {
 typedef KidHashkey *KidHashmapKeyCopyFunc(KidHashkey *key);
 typedef void KidHashmapKeyFreeFunc(KidHashkey *key);
 struct KidHashmap {
-  KidListHead keys;     // List<KidHashkey>
-  KidListHead *buckets; // Array<List<KidHashmapEntry>>
+  KidListHead keys;     // List<KidHashkey*>
+  KidListHead *buckets; // Array<List<KidListHead>>
 
   KidHashmapKeyCopyFunc *key_copy;
   KidHashmapKeyFreeFunc *key_free;
@@ -147,10 +149,13 @@ void kid_hashmap_init(KidHashmap *map, KidHashmapKeyCopyFunc *key_copy,
 KidHashkey *kid_hashmap_key_copy(KidHashkey *key);
 void kid_hashmap_key_free(KidHashkey *key);
 
+KidHashkey *kid_hashmap_key_shallow_copy(KidHashkey *key);
+void kid_hashmap_key_shallow_free(KidHashkey *key);
+
 int kid_hashmap_set(KidHashmap *map, KidHashkey *key, void *value,
                     bool free_old);
 KidHashmapEntry *kid_hashmap_get(KidHashmap *map, KidHashkey *key);
-KidHashmapEntry *kid_hashmap_del(KidHashmap *map, KidHashkey *key,
-                                 bool free_old);
+void kid_hashmap_del(KidHashmap *map, KidHashkey *key);
+void kid_hashmap_free(KidHashmap *map);
 
 #endif

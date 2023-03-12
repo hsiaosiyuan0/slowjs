@@ -13,7 +13,9 @@
 #include "mod.h"
 #include "num.h"
 #include "obj.h"
+#include "utils/dbuf.h"
 #include "utils/kid.h"
+#include "vm/str.h"
 
 /* -- Malloc ----------------------------------- */
 
@@ -1501,6 +1503,7 @@ static void walk_children(JSRuntime *rt, JSGCObjectHeader *gp,
 
 typedef struct js_gc_dump_node {
   size_t id;
+  JSAtom name;
   uint16_t type;
   size_t self_size;
   size_t edge_count;
@@ -1555,7 +1558,11 @@ typedef struct js_gc_dump_ctx {
   KidArray nodes;
   KidArray edges;
 
-  KidHashmap obj2node;
+  KidArray strs;     // Array<JSString*>
+  KidHashmap str2id; // Hashmap<JSString*, int>
+
+  KidHashmap obj2node; // Hashmap<obj_ptr, js_gc_dump_node*>
+
   int parent;
 } js_gc_dump_ctx;
 
@@ -1571,6 +1578,10 @@ js_gc_dump_ctx *js_dump_gc_new_ctx(JSContext *ctx) {
 
   kid_array_init(&dc->nodes, sizeof(js_gc_dump_node), 0);
   kid_array_init(&dc->edges, sizeof(js_gc_dump_edge), 0);
+
+  kid_array_init(&dc->strs, sizeof(JSAtom), 0);
+  kid_hashmap_init(&dc->str2id, kid_hashmap_key_copy, kid_hashmap_key_free,
+                   NULL);
 
   kid_hashmap_init(&dc->obj2node, kid_hashmap_key_copy, kid_hashmap_key_free,
                    NULL);
@@ -1611,6 +1622,20 @@ int js_dump_gc_node_from_gp(js_gc_dump_ctx *dc, JSGCObjectHeader *gp) {
   return i;
 }
 
+int js_dump_gc_add_str(js_gc_dump_ctx *dc, JSAtom atom) {
+  KidHashkey key;
+  key.opaque = &atom;
+  key.size = sizeof(atom);
+  key.hash = -1;
+  KidHashmapEntry *e = kid_hashmap_get(&dc->str2id, &key);
+  if (e)
+    return cast_void_ptr_int(e->value);
+
+  int i = kid_array_push(&dc->strs, &atom);
+  kid_hashmap_set(&dc->str2id, &key, cast_int_void_ptr(i), false);
+  return i;
+}
+
 void js_dump_gc_process_obj(JSRuntime *rt, JSGCObjectHeader *gp,
                             JSShapeProperty *prs, JSProperty *pr, void *uctx) {
   switch (gp->gc_obj_type) {
@@ -1624,27 +1649,43 @@ void js_dump_gc_process_obj(JSRuntime *rt, JSGCObjectHeader *gp,
     key.size = sizeof(gp);
     key.hash = -1;
     int node_i = js_dump_gc_node_from_gp(dc, gp);
-    js_gc_dump_node *node = (js_gc_dump_node *)dc->nodes.slots + node_i;
+    js_gc_dump_node *nodes = kid_array(&dc->nodes, js_gc_dump_node);
+    js_gc_dump_node *node = &nodes[node_i];
     if (!node->self_size) {
       node->self_size = 10;
-      if (dc->parent > 0 && prs) {
-        js_gc_dump_node *pn = (js_gc_dump_node *)dc->nodes.slots + dc->parent;
-        pn->self_size += 10;
 
-        js_gc_dump_edge *edge = kid_malloc(sizeof(*edge));
-        if (edge) {
-          pn->edge_count += 1;
+      JSPropertyDescriptor desc;
+      int res;
 
-          edge->name_or_idx = prs->atom;
-          edge->type = __JS_AtomIsTaggedInt(edge->name_or_idx)
-                           ? JS_GC_DUMP_EDGE_TYPE_ELEM
-                           : JS_GC_DUMP_EDGE_TYPE_PROP;
-          edge->to = node_i;
-          kid_array_push(&dc->edges, edge);
-          kid_free(edge);
-        }
+      res = JS_GetOwnPropertyInternal(dc->jc, &desc, p, JS_ATOM_name);
+      if (res > 0 && JS_IsString(desc.value)) {
+        JSAtom atom = JS_NewAtomStr(dc->jc, JS_VALUE_GET_PTR(desc.value));
+        node->name = js_dump_gc_add_str(dc, atom);
+        JS_FreeAtom(dc->jc, atom);
       }
     }
+    if (dc->parent > 0 && prs) {
+      js_gc_dump_node *pn = &nodes[dc->parent];
+      pn->self_size += 10;
+
+      js_gc_dump_edge edge;
+      pn->edge_count += 1;
+      edge.name_or_idx = prs->atom;
+      edge.type = __JS_AtomIsTaggedInt(edge.name_or_idx)
+                      ? JS_GC_DUMP_EDGE_TYPE_ELEM
+                      : JS_GC_DUMP_EDGE_TYPE_PROP;
+      if (edge.type == JS_GC_DUMP_EDGE_TYPE_PROP) {
+        edge.name_or_idx = js_dump_gc_add_str(dc, prs->atom);
+      }
+      edge.to = node_i * 5;
+      kid_array_push(&dc->edges, &edge);
+    }
+    if (prs && !__JS_AtomIsTaggedInt(prs->atom)) {
+      const char *pp =
+          JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), prs->atom);
+      printf("propname: %s\n", pp);
+    }
+
     printf("[%s %p] id: %zu self_size: %zu\n",
            JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), atom), (void *)p,
            node->id, node->self_size);
@@ -1653,6 +1694,63 @@ void js_dump_gc_process_obj(JSRuntime *rt, JSGCObjectHeader *gp,
     break;
   }
   }
+}
+
+void js_dump_gc_write_nodes(FILE *fp, js_gc_dump_ctx *dc) {
+  DynBuf dbuf;
+  js_gc_dump_node *nodes = kid_array(&dc->nodes, js_gc_dump_node);
+
+  js_dbuf_init(dc->jc, &dbuf);
+
+  for (int i = 0, len = dc->nodes.len; i < len; i++) {
+    js_gc_dump_node *node = &nodes[i];
+    dbuf_printf(&dbuf, "%d,%d,%zu,%zu,%zu", node->type, node->name, node->id,
+                node->self_size, node->edge_count);
+    if (i != len - 1)
+      dbuf_putstr(&dbuf, ",\n");
+    else
+      dbuf_putstr(&dbuf, "\n");
+  }
+  fwrite(dbuf.buf, 1, dbuf.size, fp);
+  dbuf_free(&dbuf);
+}
+
+void js_dump_gc_write_edges(FILE *fp, js_gc_dump_ctx *dc) {
+  DynBuf dbuf;
+  js_gc_dump_edge *edges = kid_array(&dc->edges, js_gc_dump_edge);
+
+  js_dbuf_init(dc->jc, &dbuf);
+
+  for (int i = 0, len = dc->edges.len; i < len; i++) {
+    js_gc_dump_edge *edge = &edges[i];
+    dbuf_printf(&dbuf, "%d,%d,%zu", edge->type, edge->name_or_idx, edge->to);
+    if (i != len - 1)
+      dbuf_putstr(&dbuf, ",\n");
+    else
+      dbuf_putstr(&dbuf, "\n");
+  }
+  fwrite(dbuf.buf, 1, dbuf.size, fp);
+  dbuf_free(&dbuf);
+}
+
+void js_dump_gc_write_strs(FILE *fp, js_gc_dump_ctx *dc) {
+  DynBuf dbuf;
+  JSAtom *strs = kid_array(&dc->strs, JSAtom);
+
+  js_dbuf_init(dc->jc, &dbuf);
+
+  for (int i = 0, len = dc->strs.len; i < len; i++) {
+    JSAtom atom = strs[i];
+    const char *cstr = JS_AtomToCString(dc->jc, atom);
+    dbuf_printf(&dbuf, "\"%s\"", cstr);
+    JS_FreeCString(dc->jc, cstr);
+    if (i != len - 1)
+      dbuf_putstr(&dbuf, ",\n");
+    else
+      dbuf_putstr(&dbuf, "\n");
+  }
+  fwrite(dbuf.buf, 1, dbuf.size, fp);
+  dbuf_free(&dbuf);
 }
 
 void js_dump_gc_write2file(js_gc_dump_ctx *dc) {
@@ -1723,9 +1821,15 @@ void js_dump_gc_write2file(js_gc_dump_ctx *dc) {
   fprintf(fp, "  },\n"); // snapshot close
 
   fprintf(fp, "  \"nodes\": [\n"); // nodes
+  js_dump_gc_write_nodes(fp, dc);
   fprintf(fp, "  ],\n");           // nodes close
 
   fprintf(fp, "  \"edges\": [\n"); // edges
+  js_dump_gc_write_edges(fp, dc);
+  fprintf(fp, "  ],\n");            // edges close
+
+  fprintf(fp, "  \"strings\": [\n"); // edges
+  js_dump_gc_write_strs(fp, dc);
   fprintf(fp, "  ]\n");            // edges close
 
   fprintf(fp, "}"); // end
@@ -1749,6 +1853,14 @@ void __js_dump_gc_objects(JSContext *ctx) {
   }
 
   js_dump_gc_write2file(dc);
+  kid_array_free(&dc->nodes);
+  kid_array_free(&dc->edges);
+  kid_array_free(&dc->strs);
+  kid_hashmap_free(&dc->str2id);
+  kid_hashmap_free(&dc->obj2node);
+
+  kid_set_allocator(NULL);
+  js_free_rt(rt, dc);
 }
 
 JSValue js_dump_gc_objects(JSContext *ctx, JSValueConst this_val, int argc,

@@ -28,12 +28,6 @@ void *kid_mallocz(size_t size) {
 
 /* -- String ----------------------------------- */
 
-KidString kid_string_from_cstr(const char *cstr) {
-  return (KidString){
-      strlen(cstr),
-  };
-}
-
 /* -- Array ----------------------------------- */
 
 static int kid_array_grow(KidArray *arr) {
@@ -137,6 +131,21 @@ void kid_hashmap_key_free(KidHashkey *key) {
   kid_free(key);
 }
 
+KidHashkey *kid_hashmap_key_shallow_copy(KidHashkey *key) {
+  KidHashkey *k = kid_malloc(sizeof(*k));
+  if (!k)
+    return NULL;
+
+  kid_list_init_head(&k->link);
+  k->hash = -1;
+
+  k->size = key->size;
+  k->opaque = key->opaque;
+  return k;
+}
+
+void kid_hashmap_key_shallow_free(KidHashkey *key) { kid_free(key); }
+
 unsigned int kid_hashmap_hash(KidHashkey *key) {
   if (key->hash & 0x80000000) {
     key->hash = elf_Hash(key->opaque, key->size) & KID_HASHMAP_BUCKETS_MASK;
@@ -199,17 +208,41 @@ int kid_hashmap_set(KidHashmap *map, KidHashkey *key, void *value,
   return 0;
 }
 
-KidHashmapEntry *kid_hashmap_del(KidHashmap *map, KidHashkey *key,
-                                 bool free_old) {
+void kid_hashmap_del(KidHashmap *map, KidHashkey *key) {
   KidHashmapEntry *e = kid_hashmap_get(map, key);
   if (!e)
-    return NULL;
+    return;
 
   kid_list_del(&e->link);
 
-  if (free_old && map->value_free) {
+  kid_list_del(&e->key->link);
+  if (map->key_free)
+    map->key_free(e->key);
+
+  if (map->value_free) {
     map->value_free(e->value);
-    return NULL;
   }
-  return e;
+}
+
+void kid_hashmap_free(KidHashmap *map) {
+  struct KidListHead *el, *el1;
+  if (map->key_free) {
+    kid_list_for_each(el, &map->keys) {
+      KidHashkey *k = kid_list_entry(el, KidHashkey, link);
+      map->key_free(k);
+    }
+  }
+
+  for (int i = 0; i < KID_HASHMAP_BUCKETS_LEN; i++) {
+    KidListHead *bucket = (KidListHead *)map->buckets + i;
+    kid_list_for_each_safe(el, el1, bucket) {
+      KidHashmapEntry *e = kid_list_entry(el, KidHashmapEntry, link);
+      if (map->value_free)
+        map->value_free(e->value);
+      kid_list_del(&e->link);
+      kid_free(e);
+    }
+  }
+
+  kid_free(map->buckets);
 }
