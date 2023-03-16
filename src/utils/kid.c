@@ -28,6 +28,17 @@ void *kid_mallocz(size_t size) {
 
 /* -- String ----------------------------------- */
 
+KidString kid_string_new(const char *data, size_t len) {
+  char *d = NULL;
+  if (len)
+    d = kid_malloc(len);
+
+  memcpy(d, data, len);
+  return (KidString){d, len};
+}
+
+void kid_string_free(KidString str) { kid_free(str.data); }
+
 /* -- Array ----------------------------------- */
 
 static int kid_array_grow(KidArray *arr) {

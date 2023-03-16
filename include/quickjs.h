@@ -349,8 +349,8 @@ void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
 typedef void JS_MarkFunc(JSRuntime *rt, JSGCObjectHeader *gp);
 typedef struct JSProperty JSProperty;
 typedef struct JSShapeProperty JSShapeProperty;
-typedef void JS_WalkFunc(JSRuntime *rt, JSGCObjectHeader *gp,
-                         JSShapeProperty *prs, JSProperty *pr, void *uctx);
+typedef void JS_WalkFunc(JSRuntime *rt, void *cell, JSShapeProperty *prs,
+                         JSProperty *pr, void *uctx);
 void JS_MarkValue(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
 void JS_WalkValue(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
                   JSShapeProperty *prs, JSProperty *pr, void *uctx);

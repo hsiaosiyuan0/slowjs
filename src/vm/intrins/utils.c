@@ -43,6 +43,8 @@ JSValue JS_InstantiateFunctionListItem2(JSContext *ctx, JSObject *p,
   const JSCFunctionListEntry *e = opaque;
   JSValue val;
 
+  char atom_buf[ATOM_GET_STR_BUF_SIZE];
+
   switch (e->def_type) {
   case JS_DEF_CFUNC:
     val = JS_NewCFunction2(ctx, e->u.func.cfunc.generic, e->name,
@@ -52,10 +54,16 @@ JSValue JS_InstantiateFunctionListItem2(JSContext *ctx, JSObject *p,
     val = JS_NewAtomString(ctx, e->u.str);
     break;
   case JS_DEF_OBJECT:
+
+  {
+
+    const char *pp = JS_AtomGetStrRT(ctx->rt, atom_buf, sizeof(atom_buf), atom);
+    printf("JS_InstantiateFunctionListItem2: %s\n", pp);
+
     val = JS_NewObject(ctx);
     JS_SetPropertyFunctionList(ctx, val, e->u.prop_list.tab,
                                e->u.prop_list.len);
-    break;
+  } break;
   default:
     abort();
   }

@@ -151,6 +151,7 @@ DEF(static_computed_field, "<static_computed_field>") /* must come after compute
 DEF(class_fields_init, "<class_fields_init>")
 DEF(brand, "<brand>")
 DEF(hash_constructor, "#constructor")
+DEF(shape, "<shape>")
 DEF(as, "as")
 DEF(from, "from")
 DEF(meta, "meta")

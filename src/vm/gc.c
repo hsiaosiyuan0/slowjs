@@ -17,6 +17,7 @@
 #include "utils/kid.h"
 #include "vm/str.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 
 /* -- Malloc ----------------------------------- */
@@ -1397,8 +1398,11 @@ void js_bound_function_walk(JSRuntime *rt, JSValueConst val,
 void js_for_in_iterator_walk(JSRuntime *rt, JSValueConst val,
                              JS_WalkFunc *walk_func, void *uctx) {}
 
-static void js_autoinit_walk(JSRuntime *rt, JSProperty *pr,
-                             JS_WalkFunc *walk_func, void *uctx) {}
+static void js_autoinit_walk(JSRuntime *rt, JSShapeProperty *prs,
+                             JSProperty *pr, JS_WalkFunc *walk_func,
+                             void *uctx) {
+  walk_func(rt, &js_autoinit_get_realm(pr)->header, prs, pr, uctx);
+}
 
 static void JS_WalkContext(JSRuntime *rt, JSContext *ctx,
                            JS_WalkFunc *walk_func, void *uctx) {}
@@ -1409,6 +1413,7 @@ void JS_WalkValue(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
     switch (JS_VALUE_GET_TAG(val)) {
     case JS_TAG_OBJECT:
     case JS_TAG_FUNCTION_BYTECODE:
+    case JS_TAG_STRING:
       walk_func(rt, JS_VALUE_GET_PTR(val), prs, pr, uctx);
       break;
     default:
@@ -1445,7 +1450,7 @@ static void walk_children(JSRuntime *rt, JSGCObjectHeader *gp,
               walk_func(rt, &pr->u.var_ref->header, prs, pr, uctx);
             }
           } else if ((prs->flags & JS_PROP_TMASK) == JS_PROP_AUTOINIT) {
-            js_autoinit_walk(rt, pr, walk_func, uctx);
+            js_autoinit_walk(rt, prs, pr, walk_func, uctx);
           }
         } else {
           JS_WalkValue(rt, pr->u.value, walk_func, prs, pr, uctx);
@@ -1560,7 +1565,7 @@ typedef struct js_gc_dump_ctx {
   KidArray nodes;
   size_t edges_len;
 
-  KidArray strs;     // Array<JSString*>
+  KidArray strs;     // Array<KidString>
   KidHashmap str2id; // Hashmap<JSString*, int>
 
   KidHashmap obj2node; // Hashmap<obj_ptr, js_gc_dump_node*>
@@ -1580,9 +1585,9 @@ js_gc_dump_ctx *js_dump_gc_new_ctx(JSContext *ctx) {
 
   kid_array_init(&dc->nodes, sizeof(js_gc_dump_node), 0);
 
-  kid_array_init(&dc->strs, sizeof(JSAtom), 0);
-  kid_hashmap_init(&dc->str2id, kid_hashmap_key_copy, kid_hashmap_key_free,
-                   NULL);
+  kid_array_init(&dc->strs, sizeof(KidString), 0);
+  kid_hashmap_init(&dc->str2id, kid_hashmap_key_shallow_copy,
+                   kid_hashmap_key_shallow_free, NULL);
 
   kid_hashmap_init(&dc->obj2node, kid_hashmap_key_copy, kid_hashmap_key_free,
                    NULL);
@@ -1612,11 +1617,13 @@ int js_dump_gc_node_from_gp(js_gc_dump_ctx *dc, JSGCObjectHeader *gp) {
   if (e)
     return cast_void_ptr_int(e->value);
 
-  js_gc_dump_node item = {dc->nodes.len, 0};
+  js_gc_dump_node item = {dc->nodes.len, 0, JS_GC_DUMP_NODE_TYPE_HIDDEN, 0};
   int i = kid_array_push(&dc->nodes, &item);
   if (i < 0)
     return -1;
+
   js_gc_dump_node *node = &kid_array(&dc->nodes, js_gc_dump_node)[i];
+  node->name = -2;
   kid_array_init(&node->edges, sizeof(js_gc_dump_edge), 0);
 
   kid_hashmap_set(&dc->obj2node, &key, NULL, false);
@@ -1625,81 +1632,212 @@ int js_dump_gc_node_from_gp(js_gc_dump_ctx *dc, JSGCObjectHeader *gp) {
   return i;
 }
 
-int js_dump_gc_add_str(js_gc_dump_ctx *dc, JSAtom atom) {
+int js_dump_gc_add_cstr(js_gc_dump_ctx *dc, const char *cstr, size_t len) {
   KidHashkey key;
-  key.opaque = &atom;
-  key.size = sizeof(atom);
+  key.opaque = (void *)cstr;
+  key.size = len;
   key.hash = -1;
   KidHashmapEntry *e = kid_hashmap_get(&dc->str2id, &key);
   if (e)
     return cast_void_ptr_int(e->value);
 
-  int i = kid_array_push(&dc->strs, &atom);
+  KidString s = kid_string_new(cstr, len);
+  int i = kid_array_push(&dc->strs, &s);
+  key.opaque = s.data;
   kid_hashmap_set(&dc->str2id, &key, cast_int_void_ptr(i), false);
   return i;
 }
 
-void js_dump_gc_process_obj(JSRuntime *rt, JSGCObjectHeader *gp,
-                            JSShapeProperty *prs, JSProperty *pr, void *uctx) {
+int js_dump_gc_add_str(js_gc_dump_ctx *dc, JSString *str) {
+  size_t len = 0;
+  const char *cstr =
+      JS_ToCStringLen(dc->jc, &len, JS_MKPTR(JS_TAG_STRING, str));
+  if (!cstr)
+    return -1;
 
+  int i = js_dump_gc_add_cstr(dc, cstr, len);
+  JS_FreeCString(dc->jc, cstr);
+  return i;
+}
+
+int js_dump_gc_add_atom(js_gc_dump_ctx *dc, JSAtom atom) {
+  JSValue str = JS_AtomToString(dc->jc, atom);
+  size_t len = 0;
+  const char *cstr = JS_ToCStringLen(dc->jc, &len, str);
+  if (!cstr) {
+    JS_FreeValue(dc->jc, str);
+    return -1;
+  }
+
+  int i = js_dump_gc_add_cstr(dc, cstr, len);
+  JS_FreeCString(dc->jc, cstr);
+  JS_FreeValue(dc->jc, str);
+  return i;
+}
+
+int js_dump_gc_get_node_name(js_gc_dump_ctx *dc, JSObject *objp) {
+  JSPropertyDescriptor desc;
+  int res, name = -1;
+  res = JS_GetOwnPropertyInternal(dc->jc, &desc, objp, JS_ATOM_name);
+  if (res > 0 && JS_IsString(desc.value)) {
+    JSAtom atom = JS_NewAtomStr(dc->jc, JS_VALUE_GET_PTR(desc.value));
+    if (atom != JS_ATOM_NULL) {
+      name = js_dump_gc_add_atom(dc, atom);
+      JS_FreeAtom(dc->jc, atom);
+    }
+  }
+  return name;
+}
+
+#define NODE_FIELD_COUNT 5
+
+// cell type maybe one of below:
+// - JSGCObjectHeader*
+// - JSString*
+// - JSShape*
+void js_dump_gc_process_obj(JSRuntime *rt, void *cell, JSShapeProperty *prs,
+                            JSProperty *pr, void *uctx) {
+  js_gc_dump_edge edge;
   js_gc_dump_ctx *dc = uctx;
-  JSObject *objp = (JSObject *)(gp);
-
-  JSAtom atom = rt->class_array[objp->class_id].class_name;
-  char atom_buf[ATOM_GET_STR_BUF_SIZE];
 
   KidHashkey key;
-  key.opaque = gp;
-  key.size = sizeof(gp);
+  key.opaque = cell;
+  key.size = sizeof(cell);
   key.hash = -1;
-  int node_i = js_dump_gc_node_from_gp(dc, gp);
+  int node_i = js_dump_gc_node_from_gp(dc, cell);
   js_gc_dump_node *nodes = kid_array(&dc->nodes, js_gc_dump_node);
   js_gc_dump_node *node = &nodes[node_i];
 
-  printf("id: %d gc_typ: %d\n", node_i, gp->gc_obj_type);
+  int tag = JS_TAG_FIRST;
+  if (pr) {
+    tag = JS_VALUE_GET_TAG(pr->u.value);
+  }
 
-  switch (gp->gc_obj_type) {
-  case JS_GC_OBJ_TYPE_JS_OBJECT: {
+  // JSAtom atom = rt->class_array[objp->class_id].class_name;
+  char atom_buf[ATOM_GET_STR_BUF_SIZE];
+  // printf("id: %d gc_typ: %d\n", node_i, gp->gc_obj_type);
 
-    if (!node->self_size) {
-      node->self_size = 10;
-      JSPropertyDescriptor desc;
-      int res;
+  if (tag == JS_TAG_STRING) {
+    node->type = JS_GC_DUMP_NODE_TYPE_STRING;
+    node->name = js_dump_gc_add_str(dc, (JSString *)cell);
+    node->self_size = ((JSString *)cell)->len;
+  } else {
+    JSGCObjectHeader *gp = cell;
 
-      res = JS_GetOwnPropertyInternal(dc->jc, &desc, objp, JS_ATOM_name);
-      if (res > 0 && JS_IsString(desc.value)) {
-        JSAtom atom = JS_NewAtomStr(dc->jc, JS_VALUE_GET_PTR(desc.value));
-        node->name = js_dump_gc_add_str(dc, atom);
-        const char *pp = JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), atom);
-        printf("name: %s %d\n", pp, node->name);
-        JS_FreeAtom(dc->jc, atom);
+    switch (gp->gc_obj_type) {
+    case JS_GC_OBJ_TYPE_JS_OBJECT: {
+      JSObject *objp = (JSObject *)(gp);
+
+      node->type = JS_GC_DUMP_NODE_TYPE_OBJECT;
+      JSValue obj = JS_MKPTR(JS_TAG_OBJECT, objp);
+      if (JS_IsArray(dc->jc, obj) &&
+          objp != JS_VALUE_GET_PTR(dc->jc->class_proto[JS_CLASS_ARRAY])) {
+        node->type = JS_GC_DUMP_NODE_TYPE_ARRAY;
+      } else if (JS_IsFunction(dc->jc, obj)) {
+        node->type = JS_GC_DUMP_NODE_TYPE_CLOSURE;
       }
+
+      // first time we see this obj
+      if (!node->self_size) {
+        node->self_size = 10;
+
+        // __proto__
+        int proto_i =
+            js_dump_gc_node_from_gp(dc, (JSGCObjectHeader *)objp->shape->proto);
+        if (proto_i > 0) {
+          edge.name_or_idx = js_dump_gc_add_atom(dc, JS_ATOM___proto__);
+          edge.type = JS_GC_DUMP_EDGE_TYPE_PROP;
+          edge.to = proto_i * NODE_FIELD_COUNT;
+          kid_array_push(&node->edges, &edge);
+          dc->edges_len++;
+        }
+
+        // shape
+        int shape_i =
+            js_dump_gc_node_from_gp(dc, (JSGCObjectHeader *)objp->shape);
+        if (shape_i > 0) {
+          edge.name_or_idx = js_dump_gc_add_atom(dc, JS_ATOM_shape);
+          // display this prop as internal which reflects in gray color
+          edge.type = JS_GC_DUMP_EDGE_TYPE_INTERNAL;
+          edge.to = shape_i * NODE_FIELD_COUNT;
+          kid_array_push(&node->edges, &edge);
+          dc->edges_len++;
+        }
+
+        if (node->name == -2) {
+          if (objp == JS_VALUE_GET_PTR(dc->jc->global_obj)) {
+            node->name = js_dump_gc_add_atom(dc, JS_ATOM_global);
+          } else {
+            node->name = js_dump_gc_get_node_name(dc, objp);
+          }
+        }
+
+        if (node->type == JS_GC_DUMP_NODE_TYPE_ARRAY) {
+          int64_t len = 0;
+          if (!js_get_length64(dc->jc, &len, obj) && len) {
+            for (int64_t i = 0; i < len; i++) {
+              JSValue el = JS_GetPropertyInt64(dc->jc, obj, i);
+              int el_i = js_dump_gc_node_from_gp(dc, JS_VALUE_GET_PTR(el));
+
+              edge.name_or_idx = i;
+              edge.type = JS_GC_DUMP_EDGE_TYPE_ELEM;
+              edge.to = el_i * NODE_FIELD_COUNT;
+
+              kid_array_push(&node->edges, &edge);
+              dc->edges_len++;
+
+              JS_FreeValue(dc->jc, el);
+            }
+          }
+        }
+      }
+      break;
+    case JS_GC_OBJ_TYPE_VAR_REF: {
+      JSVarRef *var_ref = (JSVarRef *)gp;
+      if (JS_IsString(*var_ref->pvalue)) {
+        node->type = JS_GC_DUMP_NODE_TYPE_STRING;
+      } else if (JS_IsNumber(*var_ref->pvalue)) {
+        node->type = JS_GC_DUMP_NODE_TYPE_HEAP_NUMBER;
+      }
+    } break;
+    case JS_GC_OBJ_TYPE_FUNCTION_BYTECODE: {
+      node->type = JS_GC_DUMP_NODE_TYPE_CODE;
+      break;
     }
-
-    // printf("[%s %p] id: %zu self_size: %zu\n",
-    //        JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), atom), (void *)p,
-    //        node->id, node->self_size);
-    break;
-  default:
-    break;
+    case JS_GC_OBJ_TYPE_SHAPE: {
+      JSShape *shape = (JSShape *)gp;
+      node->type = JS_GC_DUMP_NODE_TYPE_HIDDEN;
+      if (node->name == -2) {
+        node->name = js_dump_gc_add_atom(dc, JS_ATOM_shape);
+      }
+      if (!node->self_size && shape->is_hashed) {
+        node->self_size =
+            sizeof(JSShape) + sizeof(JSShapeProperty) * shape->prop_count;
+      }
+      printf("id: %zu size: %zu prop_count: %d\n", node->id, node->self_size,
+             shape->prop_count);
+    } break;
+    default:
+      break;
+    }
+    }
   }
-  }
 
+  // create edge to connect node to its parent
   if (dc->parent >= 0 && prs) {
     js_gc_dump_node *pn = &nodes[dc->parent];
     pn->self_size += 10;
 
-    js_gc_dump_edge edge;
     edge.name_or_idx = prs->atom;
     edge.type = __JS_AtomIsTaggedInt(edge.name_or_idx)
                     ? JS_GC_DUMP_EDGE_TYPE_ELEM
                     : JS_GC_DUMP_EDGE_TYPE_PROP;
     if (edge.type == JS_GC_DUMP_EDGE_TYPE_PROP) {
-      edge.name_or_idx = js_dump_gc_add_str(dc, prs->atom);
+      edge.name_or_idx = js_dump_gc_add_atom(dc, prs->atom);
     }
     const char *pp = JS_AtomGetStrRT(rt, atom_buf, sizeof(atom_buf), prs->atom);
     printf("--propname: %s %d\n", pp, edge.name_or_idx);
-    edge.to = node_i * 5;
+    edge.to = node_i * NODE_FIELD_COUNT;
     kid_array_push(&pn->edges, &edge);
     dc->edges_len++;
   }
@@ -1748,15 +1886,15 @@ void js_dump_gc_write_edges(FILE *fp, js_gc_dump_ctx *dc) {
 
 void js_dump_gc_write_strs(FILE *fp, js_gc_dump_ctx *dc) {
   DynBuf dbuf;
-  JSAtom *strs = kid_array(&dc->strs, JSAtom);
+  KidString *strs = kid_array(&dc->strs, KidString);
 
   js_dbuf_init(dc->jc, &dbuf);
 
   for (int i = 0, len = dc->strs.len; i < len; i++) {
-    JSAtom atom = strs[i];
-    const char *cstr = JS_AtomToCString(dc->jc, atom);
-    dbuf_printf(&dbuf, "\"%s\"", cstr);
-    JS_FreeCString(dc->jc, cstr);
+    KidString str = strs[i];
+    dbuf_putc(&dbuf, '"');
+    dbuf_put(&dbuf, (const uint8_t *)str.data, str.len);
+    dbuf_putc(&dbuf, '"');
     if (i != len - 1)
       dbuf_putstr(&dbuf, ",\n");
     else
@@ -1873,7 +2011,13 @@ void __js_dump_gc_objects(JSContext *ctx) {
   }
   kid_array_free(&dc->nodes);
 
+  KidString *strs = kid_array(&dc->strs, KidString);
+  for (int i = 0, len = dc->strs.len; i < len; i++) {
+    KidString str = strs[i];
+    kid_string_free(str);
+  }
   kid_array_free(&dc->strs);
+
   kid_hashmap_free(&dc->str2id);
   kid_hashmap_free(&dc->obj2node);
 

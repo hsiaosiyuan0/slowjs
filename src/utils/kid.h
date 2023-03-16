@@ -26,11 +26,12 @@ void *kid_malloc(size_t size);
 /* -- String ----------------------------------- */
 
 typedef struct KidString {
-  unsigned char *data;
+  char *data;
   size_t len;
 } KidString;
 
-KidString kid_string_from_cstr(const char *cstr);
+KidString kid_string_new(const char *data, size_t len);
+void kid_string_free(KidString str);
 
 /* -- Array ----------------------------------- */
 
