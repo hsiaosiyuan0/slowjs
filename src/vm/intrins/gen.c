@@ -37,7 +37,7 @@ void js_generator_mark(JSRuntime *rt, JSValueConst val,
 }
 
 // TODO:
-void js_generator_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+void js_generator_gcdump(JSRuntime *rt, JSValueConst val, JS_GCDumpFunc *walk_func,
                        void *uctx) {}
 
 /* XXX: use enum */

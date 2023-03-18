@@ -815,8 +815,8 @@ void js_regexp_string_iterator_mark(JSRuntime *rt, JSValueConst val,
 }
 
 // TODO:
-void js_regexp_string_iterator_walk(JSRuntime *rt, JSValueConst val,
-                                    JS_WalkFunc *walk_func, void *uctx) {}
+void js_regexp_string_iterator_gcdump(JSRuntime *rt, JSValueConst val,
+                                    JS_GCDumpFunc *walk_func, JS_GCDumpFuncContext dctx) {}
 
 static JSValue js_regexp_string_iterator_next(JSContext *ctx,
                                               JSValueConst this_val, int argc,

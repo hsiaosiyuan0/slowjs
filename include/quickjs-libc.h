@@ -55,7 +55,7 @@ void js_std_set_worker_new_context_func(JSContext *(*func)(JSRuntime *rt));
 JSValue js_debug_pc2line(JSContext *ctx, JSValueConst this_val, int argc,
                          JSValueConst *argv);
 
-JSValue js_dump_gc_objects(JSContext *ctx, JSValueConst this_val, int argc,
+JSValue js_gcdump_objects(JSContext *ctx, JSValueConst this_val, int argc,
                            JSValueConst *argv);
 
 #ifdef __cplusplus

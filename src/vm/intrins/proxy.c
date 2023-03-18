@@ -24,7 +24,7 @@ void js_proxy_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func) {
 }
 
 // TODO:
-void js_proxy_walk(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
+void js_proxy_gcdump(JSRuntime *rt, JSValueConst val, JS_GCDumpFunc *walk_func,
                    void *uctx) {}
 
 JSValue JS_ThrowTypeErrorRevokedProxy(JSContext *ctx) {

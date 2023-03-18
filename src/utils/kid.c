@@ -23,7 +23,9 @@ void *kid_mallocz(size_t size) {
   void *ptr = kid_malloc(size);
   if (!ptr)
     return NULL;
-  return memset(ptr, 0, size);
+
+  memset(ptr, 0, size);
+  return ptr;
 }
 
 /* -- String ----------------------------------- */
@@ -44,7 +46,7 @@ void kid_string_free(KidString str) { kid_free(str.data); }
 static int kid_array_grow(KidArray *arr) {
   if (arr->slots == NULL) {
     arr->slots = kid_mallocz(arr->slot_size * arr->cap);
-  } else if (arr->len == arr->cap) {
+  } else if (arr->len >= arr->cap) {
     if (arr->cap < 1024) {
       arr->cap += arr->cap;
     } else {

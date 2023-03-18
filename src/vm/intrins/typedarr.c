@@ -2030,8 +2030,8 @@ void js_typed_array_mark(JSRuntime *rt, JSValueConst val,
 }
 
 // TODO:
-void js_typed_array_walk(JSRuntime *rt, JSValueConst val,
-                         JS_WalkFunc *walk_func, void *uctx) {}
+void js_typed_array_gcdump(JSRuntime *rt, JSValueConst val,
+                         JS_GCDumpFunc *walk_func, JS_GCDumpFuncContext dctx) {}
 
 static JSValue js_dataview_constructor(JSContext *ctx, JSValueConst new_target,
                                        int argc, JSValueConst *argv) {

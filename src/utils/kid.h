@@ -46,7 +46,7 @@ int kid_array_init(KidArray *arr, size_t slot_size, size_t cap);
 void kid_array_free(KidArray *arr);
 int kid_array_push(KidArray *arr, void *item);
 
-#define kid_array(arr, typ) ((typ *)(arr)->slots)
+#define kid_array_el(arr, typ, i) ((typ *)((arr)->slots) + i)
 
 /* -- List ----------------------------------- */
 

@@ -2,6 +2,7 @@
 #define QUICKJS_GC_H
 
 #include "def.h"
+#include "utils/kid.h"
 
 /* -- Malloc ----------------------------------- */
 
@@ -44,7 +45,41 @@ void free_var_ref(JSRuntime *rt, JSVarRef *var_ref);
 void free_bytecode_atoms(JSRuntime *rt, const uint8_t *bc_buf, int bc_len,
                          BOOL use_short_opcodes);
 
-JSValue js_dump_gc_objects(JSContext *ctx, JSValueConst this_val, int argc,
-                           JSValueConst *argv);
+/* -- GC dump ----------------------------------- */
+
+typedef struct JSGCDumpEdge {
+  uint8_t type;
+  uint32_t name_or_idx;
+  size_t to;
+} JSGCDumpEdge;
+
+#define NODE_FIELD_COUNT 5
+
+typedef struct JSGCDumpNode {
+  size_t id;
+  JSAtom name;
+  uint16_t type;
+  size_t self_size;
+  KidArray edges; // Array<JSGCDumpEdge>
+} JSGCDumpNode;
+
+typedef struct JSGCDumpContext {
+  JSContext *jc;
+  KidAllocator kid_allocator;
+  KidArray nodes;
+  size_t edges_len;
+
+  KidArray strs;     // Array<KidString>
+  KidHashmap str2id; // Hashmap<JSString*, int>
+
+  KidHashmap obj2node; // Hashmap<obj_ptr, JSGCDumpNode*>
+} JSGCDumpContext;
+
+int js_gcdump_node_from_gp(JSGCDumpContext *dc, void *gp);
+int js_gcdump_add_cstr(JSGCDumpContext *dc, const char *cstr, size_t len);
+int js_gcdump_add_str(JSGCDumpContext *dc, JSString *str);
+int js_gcdump_add_atom(JSGCDumpContext *dc, JSAtom atom);
+JSValue js_gcdump_objects(JSContext *ctx, JSValueConst this_val, int argc,
+                          JSValueConst *argv);
 
 #endif

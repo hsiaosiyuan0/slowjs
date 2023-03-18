@@ -1504,8 +1504,8 @@ void js_array_iterator_mark(JSRuntime *rt, JSValueConst val,
 }
 
 // TODO:
-void js_array_iterator_walk(JSRuntime *rt, JSValueConst val,
-                            JS_WalkFunc *walk_func, void *uctx) {}
+void js_array_iterator_gcdump(JSRuntime *rt, JSValueConst val,
+                            JS_GCDumpFunc *walk_func, JS_GCDumpFuncContext dctx) {}
 
 JSValue js_create_array_iterator(JSContext *ctx, JSValueConst this_val,
                                  int argc, JSValueConst *argv, int magic) {

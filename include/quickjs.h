@@ -349,13 +349,74 @@ void JS_SetRuntimeOpaque(JSRuntime *rt, void *opaque);
 typedef void JS_MarkFunc(JSRuntime *rt, JSGCObjectHeader *gp);
 typedef struct JSProperty JSProperty;
 typedef struct JSShapeProperty JSShapeProperty;
-typedef void JS_WalkFunc(JSRuntime *rt, void *cell, JSShapeProperty *prs,
-                         JSProperty *pr, void *uctx);
 void JS_MarkValue(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func);
-void JS_WalkValue(JSRuntime *rt, JSValueConst val, JS_WalkFunc *walk_func,
-                  JSShapeProperty *prs, JSProperty *pr, void *uctx);
 void JS_RunGC(JSRuntime *rt);
 JS_BOOL JS_IsLiveObject(JSRuntime *rt, JSValueConst obj);
+
+// node types come from the v8's impl
+enum {
+  JSGCDumpEdge_TYPE_CTX_VAR,  // A variable from a function context.
+  JSGCDumpEdge_TYPE_ELEM,     // An element of an array.
+  JSGCDumpEdge_TYPE_PROP,     // A named object property.
+  JSGCDumpEdge_TYPE_INTERNAL, // A link that can't be accessed from JS,
+                              // thus, its name isn't a real property name
+                              // (e.g. parts of a ConsString).
+  JSGCDumpEdge_TYPE_HIDDEN,   // A link that is needed for proper sizes
+                              // calculation, but may be hidden from user.
+  JSGCDumpEdge_TYPE_SHORTCUT, // A link that must not be followed during
+                              // sizes calculation.
+  JSGCDumpEdge_TYPE_WEAK      // A weak reference (ignored by the GC).
+};
+
+// edge types come from the v8's impl
+enum {
+  JSGCDumpNode_TYPE_HIDDEN,      // Hidden node, may be filtered when shown to
+                                 // user.
+  JSGCDumpNode_TYPE_ARRAY,       // An array of elements.
+  JSGCDumpNode_TYPE_STRING,      // A string.
+  JSGCDumpNode_TYPE_OBJECT,      // A JS object (except for arrays and strings).
+  JSGCDumpNode_TYPE_CODE,        // Compiled code.
+  JSGCDumpNode_TYPE_CLOSURE,     // Function closure.
+  JSGCDumpNode_TYPE_REGEXP,      // RegExp.
+  JSGCDumpNode_TYPE_HEAP_NUMBER, // Number stored in the heap.
+  JSGCDumpNode_TYPE_NATIVE,      // Native object (not from V8 heap).
+  JSGCDumpNode_TYPE_SYNTHETIC,   // Synthetic object, usually used for grouping
+                                 // snapshot items together.
+  JSGCDumpNode_TYPE_CONS_STRING, // Concatenated string. A pair of pointers
+                                 // to strings.
+  JSGCDumpNode_TYPE_SLICED_STRING, // Sliced string. A fragment of another
+                                   // string.
+  JSGCDumpNode_TYPE_SYMBOL,        // A Symbol (ES6).
+  JSGCDumpNode_TYPE_BIGINT         // BigInt.
+};
+
+typedef struct JSGCDumpNode JSGCDumpNode;
+typedef struct JSGCDumpEdge JSGCDumpEdge;
+typedef struct JSGCDumpContext JSGCDumpContext;
+
+typedef struct JS_GCDumpFuncContext {
+  JSGCDumpContext *dc;
+
+  // prop info when traversing the parent object
+  JSShapeProperty *prs;
+  JSProperty *pr;
+
+  // manually specified prop name
+  union {
+    const char *n;
+    int i;
+  } p;
+  int plen; // -1: i, >0: n
+
+  int parent;
+  // user specified data
+  void *udata;
+} JS_GCDumpFuncContext;
+
+typedef void JS_GCDumpFunc(JSRuntime *rt, void *cell,
+                           JS_GCDumpFuncContext dctx);
+void JS_GCDumpValue(JSRuntime *rt, JSValueConst val, JS_GCDumpFunc *walk_func,
+                    JS_GCDumpFuncContext dctx);
 
 JSContext *JS_NewContext(JSRuntime *rt);
 void JS_FreeContext(JSContext *s);
@@ -484,8 +545,8 @@ typedef struct JSClassExoticMethods {
 typedef void JSClassFinalizer(JSRuntime *rt, JSValue val);
 typedef void JSClassGCMark(JSRuntime *rt, JSValueConst val,
                            JS_MarkFunc *mark_func);
-typedef void JSClassGCWalk(JSRuntime *rt, JSValueConst val,
-                           JS_WalkFunc *walk_func, void *uctx);
+typedef void JSClassGCDump(JSRuntime *rt, JSValueConst val,
+                           JS_GCDumpFunc *walk_func, JS_GCDumpFuncContext dctx);
 #define JS_CALL_FLAG_CONSTRUCTOR (1 << 0)
 typedef JSValue JSClassCall(JSContext *ctx, JSValueConst func_obj,
                             JSValueConst this_val, int argc, JSValueConst *argv,
@@ -495,7 +556,7 @@ typedef struct JSClassDef {
   const char *class_name;
   JSClassFinalizer *finalizer;
   JSClassGCMark *gc_mark;
-  JSClassGCWalk *gc_walk;
+  JSClassGCDump *gc_dump;
   /* if call != NULL, the object is a function. If (flags &
      JS_CALL_FLAG_CONSTRUCTOR) != 0, the function is called as a
      constructor. In this case, 'this_val' is new.target. A
