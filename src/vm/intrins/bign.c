@@ -68,6 +68,10 @@ void js_operator_set_mark(JSRuntime *rt, JSValueConst val,
   }
 }
 
+// TODO:
+void js_operator_set_gcdump(JSRuntime *rt, JSValueConst val,
+                          JS_GCDumpFunc *walk_func, JS_GCDumpFuncContext dctx) {}
+
 /* create an OperatorSet object */
 static JSValue js_operators_create_internal(JSContext *ctx, int argc,
                                             JSValueConst *argv,

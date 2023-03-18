@@ -4,13 +4,16 @@ SlowJS - QuickJS is quick but I can make it slow!
 
 Learning the awesome [QuickJS](https://github.com/bellard/quickjs) by extending it with below functionalities:
 
-- [x] Divide the 5.4W LoC [quickjs.c](https://github.com/bellard/quickjs/blob/master/quickjs.c) into multiple small files, which makes the code easy to browser and navigate
+- [x] Divide the 5.4W LoC [quickjs.c](https://github.com/bellard/quickjs) into multiple small files, makes the code easy to browser and navigate
 - [x] A debugger which supports inline breakpoints and includes web interfaces which is easy to integrate with the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
-- [ ] Dump the GC managed objects and view the results in the Chrome inspector
+- [x] Dump the GC managed objects and view the results in the Chrome devtools
 
 ## Debugger
 
 The debugger can be tasted by following steps:
+
+<details>
+  <summary>Click to expand</summary>
 
 1. Build our SlowJS:
 
@@ -167,10 +170,63 @@ the output looks like:
 11. Now the test script is done and the debugger server prints the final results:
 
 ```bash
-client closed, stopping sess thread...
 new sess thread is running...
 2
 ```
+
+</details>
+
+## GC Dump
+
+The GC dump functionality can be tasted by following steps:
+
+<details>
+  <summary>Click to expand</summary>
+
+
+1. Build our SlowJS:
+
+```bash
+cmake -S . --preset=default
+cmake --build --preset=qjs
+```
+
+the location of the built stuff is `./build/qjs/qjs`
+
+2. Make up a file `tmp_test.js` to test:
+
+```js
+var o = {
+  a: { a1: { a2: 1 } },
+  b: { b1: { b2: 1 } },
+  c: function () {
+    return 1;
+  },
+  d: new ArrayBuffer((1 << 20) * 50, 0),
+  e: new Uint16Array((1 << 20) * 50, 0),
+};
+
+__js_gcdump_objects();
+print(o); // retain the obj to prevent it from being freed
+```
+
+3. Run the test script:
+
+```bash
+./build/qjs/qjs tmp_test.js
+```
+
+4. The output file will have name looks like `Heap.20230318.123156.775845.heapsnapshot` in this pattern `Heap.date.time.ms.heapsnapshot`
+
+5. Import the output file into Chrome devtools:
+
+   ![](/docs/imgs/chrome-devtools-load-heap.png)
+
+6. The we can dig into the heap:
+
+   ![](/docs/imgs/chrome-devtools-heap.png)
+
+</details>
 
 ## Development
 

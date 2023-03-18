@@ -146,90 +146,93 @@ redo:
       goto def_token;
     }
     break;
-    // clang-format off
-    case 'a': case 'b': case 'c': case 'd':
-    case 'e': case 'f': case 'g': case 'h':
-    case 'i': case 'j': case 'k': case 'l':
-    case 'm': case 'n': case 'o': case 'p':
-    case 'q': case 'r': case 's': case 't':
-    case 'u': case 'v': case 'w': case 'x':
-    case 'y': case 'z': 
-    case 'A': case 'B': case 'C': case 'D':
-    case 'E': case 'F': case 'G': case 'H':
-    case 'I': case 'J': case 'K': case 'L':
-    case 'M': case 'N': case 'O': case 'P':
-    case 'Q': case 'R': case 'S': case 'T':
-    case 'U': case 'V': case 'W': case 'X':
-    case 'Y': case 'Z': 
-    case '_':
-    case '$':
-    // clang-format on  
-        /* identifier : only pure ascii characters are accepted */
-        p++;
-        atom = json_parse_ident(s, &p, c);
-        if (atom == JS_ATOM_NULL)
-            goto fail;
-        s->token.u.ident.atom = atom;
-        s->token.u.ident.has_escape = FALSE;
-        s->token.u.ident.is_reserved = FALSE;
-        s->token.val = TOK_IDENT;
-        break;
-    case '+':
-        if (!s->ext_json || !is_digit(p[1]))
-            goto def_token;
-        goto parse_number;
-    case '0':
-        if (is_digit(p[1]))
-            goto def_token;
-        goto parse_number;
-    case '-':
-        if (!is_digit(p[1]))
-            goto def_token;
-        goto parse_number;
-    case '1': case '2': case '3': case '4':
-    case '5': case '6': case '7': case '8':
-    case '9': 
-        /* number */
-    parse_number:
-        {
-            JSValue ret;
-            int flags, radix;
-            if (!s->ext_json) {
-                flags = 0;
-                radix = 10;
-            } else {
-                flags = ATOD_ACCEPT_BIN_OCT;
-                radix = 0;
-            }
-            ret = js_atof(s->ctx, (const char *)p, (const char **)&p, radix,
-                          flags);
-            if (JS_IsException(ret))
-                goto fail;
-            s->token.val = TOK_NUMBER;
-            s->token.u.num.val = ret;
-        }
-        break;
-    default:
-        if (c >= 128) {
-            js_parse_error(s, "unexpected character");
-            goto fail;
-        }
-    def_token:
-        s->token.val = c;
-        p++;
-        break;
+  // clang-format off
+  case 'a': case 'b': case 'c': case 'd':
+  case 'e': case 'f': case 'g': case 'h':
+  case 'i': case 'j': case 'k': case 'l':
+  case 'm': case 'n': case 'o': case 'p':
+  case 'q': case 'r': case 's': case 't':
+  case 'u': case 'v': case 'w': case 'x':
+  case 'y': case 'z': 
+  case 'A': case 'B': case 'C': case 'D':
+  case 'E': case 'F': case 'G': case 'H':
+  case 'I': case 'J': case 'K': case 'L':
+  case 'M': case 'N': case 'O': case 'P':
+  case 'Q': case 'R': case 'S': case 'T':
+  case 'U': case 'V': case 'W': case 'X':
+  case 'Y': case 'Z': 
+  case '_':
+  case '$':
+    /* identifier : only pure ascii characters are accepted */
+      p++;
+    atom = json_parse_ident(s, &p, c);
+      if (atom == JS_ATOM_NULL)
+        goto fail;
+    s->token.u.ident.atom = atom;
+    s->token.u.ident.has_escape = FALSE;
+    s->token.u.ident.is_reserved = FALSE;
+    s->token.val = TOK_IDENT;
+    break;
+    // clang-format on
+  case '+':
+    if (!s->ext_json || !is_digit(p[1]))
+      goto def_token;
+    goto parse_number;
+  case '0':
+    if (is_digit(p[1]))
+      goto def_token;
+    goto parse_number;
+  case '-':
+    if (!is_digit(p[1]))
+      goto def_token;
+    goto parse_number;
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9':
+    /* number */
+  parse_number : {
+    JSValue ret;
+    int flags, radix;
+    if (!s->ext_json) {
+      flags = 0;
+      radix = 10;
+    } else {
+      flags = ATOD_ACCEPT_BIN_OCT;
+      radix = 0;
     }
-    s->buf_ptr = p;
+    ret = js_atof(s->ctx, (const char *)p, (const char **)&p, radix, flags);
+    if (JS_IsException(ret))
+      goto fail;
+    s->token.val = TOK_NUMBER;
+    s->token.u.num.val = ret;
+  } break;
+  default:
+    if (c >= 128) {
+      js_parse_error(s, "unexpected character");
+      goto fail;
+    }
+  def_token:
+    s->token.val = c;
+    p++;
+    break;
+  }
+  s->buf_ptr = p;
 
-    //    dump_token(s, &s->token);
-    return 0;
+  //    dump_token(s, &s->token);
+  return 0;
 
- fail:
-    s->token.val = TOK_ERROR;
-    return -1;
+fail:
+  s->token.val = TOK_ERROR;
+  return -1;
 }
 
-  int json_parse_expect(JSParseState *s, int tok) {
+int json_parse_expect(JSParseState *s, int tok) {
   if (s->token.val != tok) {
     /* XXX: dump token correctly in all cases */
     return js_parse_error(s, "expecting '%c'", tok);
@@ -237,7 +240,7 @@ redo:
   return json_next_token(s);
 }
 
-  JSValue json_parse_value(JSParseState *s) {
+JSValue json_parse_value(JSParseState *s) {
   JSContext *ctx = s->ctx;
   JSValue val = JS_NULL;
   int ret;

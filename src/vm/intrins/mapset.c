@@ -479,6 +479,10 @@ void js_map_mark(JSRuntime *rt, JSValueConst val, JS_MarkFunc *mark_func) {
   }
 }
 
+// TODO:
+void js_map_gcdump(JSRuntime *rt, JSValueConst val, JS_GCDumpFunc *walk_func,
+                 void *uctx) {}
+
 /* Map Iterator */
 
 void js_map_iterator_finalizer(JSRuntime *rt, JSValue val) {
@@ -508,6 +512,10 @@ void js_map_iterator_mark(JSRuntime *rt, JSValueConst val,
     JS_MarkValue(rt, it->obj, mark_func);
   }
 }
+
+// TODO:
+void js_map_iterator_gcdump(JSRuntime *rt, JSValueConst val,
+                          JS_GCDumpFunc *walk_func, JS_GCDumpFuncContext dctx) {}
 
 static JSValue js_create_map_iterator(JSContext *ctx, JSValueConst this_val,
                                       int argc, JSValueConst *argv, int magic) {

@@ -3606,7 +3606,11 @@ void js_std_add_helpers(JSContext *ctx, int argc, char **argv) {
 
   JS_SetPropertyStr(
       ctx, global_obj, "__js_debug_pc2line",
-      JS_NewCFunction(ctx, js_debug_pc2line, "__js_debug_pc2line", 0));
+      JS_NewCFunction(ctx, js_debug_pc2line, "__js_debug_pc2line", 1));
+
+  JS_SetPropertyStr(
+      ctx, global_obj, "__js_gcdump_objects",
+      JS_NewCFunction(ctx, js_gcdump_objects, "__js_gcdump_objects", 0));
 
   JS_FreeValue(ctx, global_obj);
 }
