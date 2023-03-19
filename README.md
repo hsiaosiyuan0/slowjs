@@ -230,7 +230,7 @@ The GC dump functionality can be tasted by following steps:
 
    ![](/docs/imgs/chrome-devtools-load-heap.png)
 
-6. The we can dig into the heap:
+6. Then we can dig into the heap:
 
    ![](/docs/imgs/chrome-devtools-heap.png)
 
