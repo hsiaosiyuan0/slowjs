@@ -2,7 +2,7 @@
 
 SlowJS - QuickJS is quick but I can make it slow!
 
-Learning the awesome [QuickJS](https://github.com/bellard/quickjs) by extending it with below functionalities:
+Learning the awesome [QuickJS](https://github.com/bellard/quickjs/blob/2788d71e823b522b178db3b3660ce93689534e6d/quickjs.c) by extending it with below functionalities:
 
 - [x] Divide the 5.4W LoC [quickjs.c](https://github.com/bellard/quickjs) into multiple small files, makes the code easy to browser and navigate
 - [x] A debugger which supports inline breakpoints and includes web interfaces which is easy to integrate with the [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/)
