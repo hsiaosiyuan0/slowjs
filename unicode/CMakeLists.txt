@@ -1,7 +1,7 @@
 add_executable(unicode_gen "unicode_gen.c")
 target_include_directories(quickjs PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
-target_link_libraries(unicode_gen libs)
+target_link_libraries(unicode_gen qjslibs)
 
 set(UNICODE_GEN "${PROJECT_BINARY_DIR}/unicode/unicode_gen")
 
