@@ -33,7 +33,7 @@ JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
   JSVarRef **var_refs;
   size_t alloca_size;
 
-#if !DIRECT_DISPATCH
+#if !DIRECT_DISPATCH || defined(INDIRECT_DISPATCH)
 #define SWITCH(pc)    switch (opcode = *pc++)
 #define CASE(op)    case op
 #define DEFAULT     default

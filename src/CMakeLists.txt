@@ -39,6 +39,12 @@ if(QJS_DUMP_BYTECODE)
   target_compile_definitions(quickjs PUBLIC DUMP_BYTECODE=${QJS_DUMP_BYTECODE})
 endif()
 
+option(QJS_INDIRECT_DISPATCH "Use indirect dispath" OFF)
+if(QJS_INDIRECT_DISPATCH)
+  target_compile_definitions(quickjs PRIVATE INDIRECT_DISPATCH=y)
+endif()
+
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(quickjs PRIVATE DUMP_LEAKS=1)
 endif()
