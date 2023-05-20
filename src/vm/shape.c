@@ -386,16 +386,19 @@ JSShape *find_hashed_shape_prop(JSRuntime *rt, JSShape *sh, JSAtom atom,
   h = shape_hash(h, atom);
   h = shape_hash(h, prop_flags);
   h1 = get_shape_hash(h, rt->shape_hash_bits);
+  // literate the bucket
   for (sh1 = rt->shape_hash[h1]; sh1 != NULL; sh1 = sh1->shape_hash_next) {
     /* we test the hash first so that the rest is done only if the
        shapes really match */
     if (sh1->hash == h && sh1->proto == sh->proto &&
         sh1->prop_count == ((n = sh->prop_count) + 1)) {
+      // check if all the props are matched
       for (i = 0; i < n; i++) {
         if (unlikely(sh1->prop[i].atom != sh->prop[i].atom) ||
             unlikely(sh1->prop[i].flags != sh->prop[i].flags))
           goto next;
       }
+      // check if the new prop are matched
       if (unlikely(sh1->prop[n].atom != atom) ||
           unlikely(sh1->prop[n].flags != prop_flags))
         goto next;

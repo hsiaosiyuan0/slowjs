@@ -1227,7 +1227,8 @@ JSProperty *add_property(JSContext *ctx, JSObject *p, JSAtom prop,
     if (new_sh) {
       /* matching shape found: use it */
       /*  the property array may need to be resized */
-      if (new_sh->prop_size != sh->prop_size) {
+      // prop_size here works like the buffer size, not the prop_count
+      if (new_sh->prop_size != sh->prop_size) { 
         JSProperty *new_prop;
         new_prop =
             js_realloc(ctx, p->prop, sizeof(p->prop[0]) * new_sh->prop_size);
