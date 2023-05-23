@@ -82,7 +82,7 @@ The debugger can be tasted by following steps:
     }
     ```
 
-6. Star to run our test script:
+6. Start to run our test script:
 
     ```json
     { "type": "run" }
