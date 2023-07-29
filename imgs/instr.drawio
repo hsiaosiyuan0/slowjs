@@ -1,0 +1,46 @@
+<mxfile host="Electron" modified="2023-06-15T00:10:33.154Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.4.0 Chrome/112.0.5615.204 Electron/24.5.1 Safari/537.36" etag="mAkLSUvYLx2VGxm-WAtv" version="21.4.0" type="device">
+  <diagram name="Page-1" id="h_tDzIKwj2xzpJzku2r2">
+    <mxGraphModel dx="1305" dy="365" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="69MDMasHWc9vSsA4iJeV-11" value="..." style="whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;strokeColor=#666666;top=0;rounded=1;bottomLeftStyle=rounded;fillColor=#F7F7F7;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="300" y="320" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-1" value="OP_invalid" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="120" y="160" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-2" value="..." style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="120" y="200" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-3" value="OP_nop" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="120" y="240" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-4" value="OP_push_minus1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="120" y="280" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-5" value="..." style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="120" y="320" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-6" value="..." style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="120" y="360" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-7" value="Final OPCodes" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="135" y="120" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-8" value="Short OPCodes" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="-30" y="325" width="130" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-9" value="" style="labelPosition=right;align=left;strokeWidth=1;shape=mxgraph.mockup.markup.curlyBrace;html=1;shadow=0;dashed=0;strokeColor=#999999;direction=north;" vertex="1" parent="1">
+          <mxGeometry x="90" y="280" width="20" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-12" value="OP_enter_scope" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;fillColor=#F7F7F7;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="300" y="280" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="69MDMasHWc9vSsA4iJeV-13" value="Temporary OPCodes" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="315" y="245" width="130" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
