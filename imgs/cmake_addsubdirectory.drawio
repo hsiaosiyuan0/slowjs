@@ -1,0 +1,55 @@
+<mxfile host="Electron" modified="2023-06-14T22:48:16.882Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.4.0 Chrome/112.0.5615.204 Electron/24.5.1 Safari/537.36" etag="Kr3UfCCrQdAzPaFh5OFE" version="21.4.0" type="device">
+  <diagram name="Page-1" id="E5dvHfNeiFHNAyvLFhtj">
+    <mxGraphModel dx="1306" dy="894" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-2" value="root/CMakeLists.txt" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="130" y="130" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-3" value="" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;fontFamily=SF Mono;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="220" y="180" width="20" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-4" value="" style="endArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="200" y="180" as="sourcePoint" />
+            <mxPoint x="200" y="520" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-5" value="Execution" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;direction=west;flipV=0;flipH=1;rotation=90;" vertex="1" parent="1">
+          <mxGeometry x="130" y="310" width="100" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-10" value="set(a 1)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;fontColor=#007FFF;" vertex="1" parent="1">
+          <mxGeometry x="248" y="200" width="90" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-11" value="&lt;font color=&quot;#b5739d&quot;&gt;add_subdirectory(src)&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="250" y="250" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-12" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.061;exitY=1.133;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="2qFV8FqUZsRjNPANSH2K-11">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="390" y="460" as="sourcePoint" />
+            <mxPoint x="460" y="284" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-13" value="src/CMakeLists.txt" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="470" y="269" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-14" value="&lt;font color=&quot;#b5739d&quot;&gt;add_subdirectory(libs)&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="250" y="325.5" width="190" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-15" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.061;exitY=1.133;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="2qFV8FqUZsRjNPANSH2K-14">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="390" y="535.5" as="sourcePoint" />
+            <mxPoint x="460" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-16" value="libs/CMakeLists.txt" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;" vertex="1" parent="1">
+          <mxGeometry x="470" y="340" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="2qFV8FqUZsRjNPANSH2K-17" value="set(b 1)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=SF Mono;fontColor=#007FFF;" vertex="1" parent="1">
+          <mxGeometry x="250" y="400" width="90" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
