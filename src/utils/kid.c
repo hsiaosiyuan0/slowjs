@@ -240,7 +240,7 @@ void kid_hashmap_del(KidHashmap *map, KidHashkey *key) {
 void kid_hashmap_free(KidHashmap *map) {
   struct KidListHead *el, *el1;
   if (map->key_free) {
-    kid_list_for_each(el, &map->keys) {
+    kid_list_for_each_safe(el, el1, &map->keys) {
       KidHashkey *k = kid_list_entry(el, KidHashkey, link);
       map->key_free(k);
     }
