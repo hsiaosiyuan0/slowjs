@@ -569,6 +569,16 @@ JSModuleDef *js_module_loader(JSContext *ctx, const char *module_name,
 
     buf = js_load_file(ctx, &buf_len, module_name);
     if (!buf) {
+      // the module name not found and then try to load the module name with .js
+      // suffix
+      size_t module_name_len = strlen(module_name);
+      char module_name_with_js[module_name_len + 4 +
+                               1]; // +4 for ".js" and +1 for null terminator
+      strcpy(module_name_with_js, module_name);
+      strcat(module_name_with_js, ".js");
+      buf = js_load_file(ctx, &buf_len, module_name_with_js);
+    }
+    if (!buf) {
       JS_ThrowReferenceError(ctx, "could not load module filename '%s'",
                              module_name);
       return NULL;
