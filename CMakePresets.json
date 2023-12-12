@@ -24,7 +24,7 @@
 				"QJS_DUMP_TOKEN": "y"
 			}
 		},
-    {
+		{
 			"name": "dump-bytecode-2",
 			"description": "Compile qjs to dump bytecode",
 			"inherits": "default",
@@ -56,7 +56,7 @@
 				"test-col"
 			]
 		},
-    {
+		{
 			"name": "test-op_loc",
 			"configurePreset": "dump-bytecode-2",
 			"targets": [
